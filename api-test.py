@@ -3,6 +3,7 @@
 import httpx
 import json
 import re
+from enum import Enum
 from datetime import datetime, date
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, Undefined, config as dcjson_config
@@ -22,6 +23,47 @@ def decode_date(datestr):
     return date.fromisoformat(f'{m.group(1)}-{m.group(2)}-{m.group(3)}')
 
 
+class SumoDivision(Enum):
+    Makuuchi = 'Makuuchi'
+    Juryo = 'Juryo'
+    Makushita = 'Makushita'
+    Sandanme = 'Sandanme'
+    Jonidan = 'Jonidan'
+    Jonokuchi = 'Jonokuchi'
+
+    def __repr__(self):
+        return self.value
+
+    def __str__(self):
+        return str(self.value)
+
+    def __contains__(self, val):
+        try:
+            SumoDivision(val)
+        except ValueError:
+            return False
+        return True
+
+class SumoResult(Enum):
+    WIN = 'win'
+    LOSS = 'loss'
+    ABSENT = 'absent'
+    FUSENSHO = 'fusen win'
+    FUSENPAI = 'fusen loss'
+    UNKNOWN = ''
+
+    def __repr__(self):
+        return self.value
+
+    def __str__(self):
+        return str(self.value)
+
+    def __contains__(self, val):
+        try:
+            SumoResult(val)
+        except ValueError:
+            return False
+        return True
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass(frozen=True)
@@ -63,25 +105,24 @@ class RikishiShikona:
 
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class RikishiStats:
-    absenceByDivision: dict[str, int]
-    basho: int
-    bashoByDivision: dict[str, int]
-    lossByDivision: dict[str, int]
-    totalAbsences: int
-    totalByDivision: dict[str, int]
-    totalMatches: int
-    totalLosses: int
-    totalWins: int
-    winsByDivision: dict[str, int]
-    yusho: int
-    yushoByDivision: dict[str, int]
-    specialPrizes: dict[str, int] = field(metadata=dcjson_config(field_name="sansho"))
-
+    absenceByDivision: dict[SumoDivision, int] = field(default_factory=dict)
+    basho: int = -1
+    bashoByDivision: dict[SumoDivision, int] = field(default_factory=dict)
+    lossByDivision: dict[SumoDivision, int] = field(default_factory=dict)
+    totalAbsences: int = -1
+    totalByDivision: dict[SumoDivision, int] = field(default_factory=dict)
+    totalMatches: int = -1
+    totalLosses: int = -1
+    totalWins: int = -1
+    winsByDivision: dict[SumoDivision, int] = field(default_factory=dict)
+    yusho: int = -1
+    yushoByDivision: dict[SumoDivision, int] = field(default_factory=dict)
+    specialPrizes: dict[str, int] = field(default_factory=dict, metadata=dcjson_config(field_name="sansho"))
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class Rikishi:
     id: int
     sumodbId: int
@@ -102,8 +143,7 @@ class Rikishi:
     rankHistory: list[RikishiRank]  = field(default_factory=list)
     shikonaHistory: list[RikishiShikona] = field(default_factory=list)
 
-    # need to make a default constructor, and a custom set() function
-    #stats: RikishiStats = RikishiStats()
+    stats: RikishiStats = RikishiStats()
 
     def __str__(self):
         s = f'{self.id}: {self.shikonaEn} [{self.heya}]'
@@ -129,7 +169,7 @@ class Rikishi:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass(frozen=True)
 class Yusho:
-    division: str = field(metadata=dcjson_config(field_name="type"))
+    division: SumoDivision = field(metadata=dcjson_config(field_name="type"))
     rikishiId: int
     shikonaEn: str
     shikonaJp: str
@@ -144,18 +184,9 @@ class SpecialPrize:
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass(frozen=True)
-class Basho:
-    bashoDate: date = field(metadata=dcjson_config(field_name="date", decoder=decode_date))
-    startDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=decode_datetime))
-    endDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=decode_datetime))
-    yusho: list[Yusho] = field(default_factory=list)
-    specialPrizes: list[SpecialPrize] = field(default_factory=list)
-
-@dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
 class BashoMatch:
     bashoId: date = field(metadata=dcjson_config(decoder=decode_date))
-    division: str
+    division: SumoDivision
     day: int
     matchNo: int
     eastId: int
@@ -165,9 +196,58 @@ class BashoMatch:
     winnerId: int
     winnerEn: str
     winnerJp: str
+    matchId: str = field(default='', metadata=dcjson_config(field_name="id"))
     eastRank: str = ''
     westRank: str = ''
     kimarite: str = ''
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass(frozen=True)
+class Basho:
+    bashoDate: date = field(metadata=dcjson_config(field_name="date", decoder=decode_date))
+    startDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=decode_datetime))
+    endDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=decode_datetime))
+    yusho: list[Yusho] = field(default_factory=list)
+    specialPrizes: list[SpecialPrize] = field(default_factory=list)
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass(frozen=True)
+class BashoTorikumi(Basho):
+    torikumi: list[BashoMatch] = field(default_factory=list)
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass(frozen=True)
+class BanzukeMatchRecord:
+    opponentID: int
+    opponentShikonaEn: str
+    opponentShikonaJp: str
+    result: SumoResult
+    kimarite: str
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass(frozen=True)
+class BanzukeRikishi:
+    rikishiId: int = field(metadata=dcjson_config(field_name="rikishiID"))
+    shikonaEn: str
+    shikonaJp: str
+    side: str
+    rankValue: int
+    rank: str
+    wins: int
+    losses: int
+    absences: int
+    record: list[BanzukeMatchRecord]
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass(frozen=True)
+class Banzuke:
+    bashoId: date = field(metadata=dcjson_config(decoder=decode_date))
+    division: SumoDivision
+    east: list[BanzukeRikishi]
+    west: list[BanzukeRikishi]
+
+
+
 
 class SumoAPI:
     """ Object wrapper around sumo-api.com API calls """
@@ -228,12 +308,17 @@ class SumoAPI:
         # print(j)
         return RikishiStats.from_dict(j)
 
-    def rikishi_matches(self, rikishiId, bashoId = None, limit = 0, skip = 0):
-        """ GET /api/rikishi/:rikishiId/matches """
+    def rikishi_matches(self, rikishiId, bashoId = None, opponentId = None, limit = 0, skip = 0):
+        """
+        GET /api/rikishi/:rikishiId/matches
+        GET /api/rikishi/:rikishiId/matches/:opponentId
+        """
         url = self.apiurl + f'/rikishi/{rikishiId}/matches'
         params={ 'limit': limit, 'skip': skip }
         if bashoId:
             params["bashoId"] = bashoId
+        if opponentId:
+            url += f'/{int(opponentId)}'
         r = httpx.get(url, params=params)
         j = r.json()
         # print(j)
@@ -249,11 +334,23 @@ class SumoAPI:
         # print(j)
         return Basho.from_dict(j)
 
-#GET /api/rikishi/:rikishiId/matches
-#GET /api/rikishi/:rikishiId/matches/:opponentId
+    def basho_banzuke(self, bashoId, division: SumoDivision):
+        """ GET /api/basho/:bashoId/banzuke/:division """
+        url = self.apiurl + f'/basho/{bashoId}/banzuke/{division}'
+        r = httpx.get(url)
+        j = r.json()
+        # print(j)
+        return Banzuke.from_dict(j)
 
-#GET /api/basho/:bashoId/banzuke/:division
-#GET /api/basho/:bashoId/torikumi/:division/:day
+    def basho_torikumi(self, bashoId, division: SumoDivision, day: int):
+        """ GET /api/basho/:bashoId/torikumi/:division/:day """
+        url = self.apiurl + f'/basho/{bashoId}/torikumi/{division}/{day}'
+        r = httpx.get(url)
+        j = r.json()
+        # print(j)
+        return BashoTorikumi.from_dict(j)
+
+
 
 #GET /api/kimarite
 #GET /api/kimarite/:kimarite
@@ -275,46 +372,67 @@ def PrintRikishi(rinput):
 
 sumo = SumoAPI()
 
+print("rikishi = sumo.rikishis(limit=2, skip=23)")
 rikishi = sumo.rikishis(limit=2, skip=23)
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi = sumo.rikishis(limit=2, skip=1111, retired=True)")
 rikishi = sumo.rikishis(limit=2, skip=1111, retired=True)
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi = sumo.rikishis(limit=2, shikonaEn='Terunofuji')")
 rikishi = sumo.rikishis(limit=2, shikonaEn='Terunofuji')
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi = sumo.rikishis(limit=2, shikonaEn='Shishi', shikonas='true', measurements='true', ranks='true')")
 rikishi = sumo.rikishis(limit=2, shikonaEn='Shishi', shikonas='true', measurements='true', ranks='true')
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi = sumo.rikishi(86)")
 rikishi = sumo.rikishi(86)
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi= sumo.rikishi(86, measurements=True)")
 rikishi= sumo.rikishi(86, measurements=True)
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi= sumo.rikishi(86, ranks=True)")
 rikishi= sumo.rikishi(86, ranks=True)
 PrintRikishi(rikishi)
 print('\n')
 
+print("rikishi= sumo.rikishi(86, shikonas=True)")
 rikishi= sumo.rikishi(86, shikonas=True)
 PrintRikishi(rikishi)
 print('\n')
 
+print("stats = sumo.rikishi_stats(45)")
 stats = sumo.rikishi_stats(45)
 print(stats)
 print('\n')
 
+print("matches = sumo.rikishi_matches(45, limit=3)")
 matches = sumo.rikishi_matches(45, limit=3)
 print(matches)
 print('\n')
 
+print("basho = sumo.basho(202411)")
 basho = sumo.basho(202411)
 print(basho)
+print('\n')
+
+print("banzuke = sumo.basho_banzuke(202409, SumoDivision.Makuuchi)")
+banzuke = sumo.basho_banzuke(202409, SumoDivision.Makuuchi)
+print(banzuke)
+print('\n')
+
+print("torikumi = sumo.basho_torikiumi(202409, SumoDivision.Juryo, 6)")
+torikumi = sumo.basho_torikumi(202409, SumoDivision.Juryo, 6)
+print(torikumi)
 print('\n')
