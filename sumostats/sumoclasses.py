@@ -112,7 +112,7 @@ class RikishiShikona:
 @dataclass()
 class RikishiStats:
     absenceByDivision: dict[SumoDivision, int] = field(default_factory=dict)
-    basho: int = -1
+    totalBasho: int = field(default=-1, metadata=dcjson_config(field_name="basho"))
     bashoByDivision: dict[SumoDivision, int] = field(default_factory=dict)
     lossByDivision: dict[SumoDivision, int] = field(default_factory=dict)
     totalAbsences: int = -1
@@ -129,8 +129,8 @@ class RikishiStats:
 @dataclass()
 class Rikishi:
     id: int
-    sumodbId: int
-    nskId: int
+    sumodbId: int = -1
+    nskId: int = -1
     shikonaEn: str = ''
     shikonaJp: str = ''
     currentRank: str = ''
@@ -258,13 +258,13 @@ class BanzukeMatchRecord:
 @dataclass()
 class BanzukeRikishi:
     rikishiId: int = field(metadata=dcjson_config(field_name="rikishiID"))
-    side: str
-    rankValue: int
-    rank: str
-    wins: int
-    losses: int
-    absences: int
-    record: list[BanzukeMatchRecord]
+    side: str = ''
+    rankValue: int = -1
+    rank: str = ''
+    wins: int = -1
+    losses: int = -1
+    absences: int = -1
+    record: list[BanzukeMatchRecord] = field(default_factory=list)
     shikonaEn: str = ''
     shikonaJp: str = ''
 

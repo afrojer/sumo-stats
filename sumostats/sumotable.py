@@ -3,6 +3,7 @@
 from .sumoapi import *
 from datetime import date
 import pickle
+import sys
 
 class SumoWrestler():
     def __init__(self, r: Rikishi, s: RikishiStats):
@@ -73,7 +74,7 @@ class SumoTable:
             # Assume we already know about this one
             return
 
-        print(f'new SumoTournament: {BashoIdStr(b.bashoDate)}')
+        sys.stdout.write(f'new SumoTournament: {BashoIdStr(b.bashoDate)}\n')
         # Add this basho to our table as a set of Tournament objects
         tournament = SumoTournament(b)
 
@@ -89,9 +90,11 @@ class SumoTable:
         return
 
     def _add_banzuke(self, tournament: SumoTournament, division: SumoDivision):
-        print(f'New Banzuke for {division}')
+        sys.stdout.write(f'New Banzuke for {division}\n')
         # Use the API to grab banzuke info
         banzuke = self.api.basho_banzuke(tournament.id(), division)
+        if not banzuke:
+            return
 
         max_bouts = 0
 
@@ -120,11 +123,11 @@ class SumoTable:
             # Assume we've already seen this wrestler
             return
 
-        print(f'    Adding wrestler:{r.rikishiId}')
+        sys.stdout.write(f'    Adding wrestler:{r.rikishiId}...                                        \r')
         # find the wrestler
         rikishi = self.api.rikishi(r.rikishiId, measurements=True, ranks=True)
         if not rikishi:
-            print(f'No Rikishi data for "{r.shikonaEn}" ID:{r.rikishiId}')
+            sys.stderr.write(f'No Rikishi data for "{r.shikonaEn}" ID:{r.rikishiId}\n')
             # TODO: use self.api.rikishis() and search by shikonaEn?
             return
 
@@ -143,7 +146,7 @@ class SumoTable:
                 while True:
                     matches = self.api.rikishi_matches(r.rikishiId, opponentId = record.opponentID, limit = limit, skip = skip)
                     w.matches_by_opponent[record.opponentID].append(matches)
-                    print(f'        +{len(matches)} matches vs. {record.opponentID}')
+                    sys.stdout.write(f'    Adding wrestler:{r.rikishiId} +{len(matches)} matches vs. {record.opponentID}                           \r')
                     if len(matches) < limit:
                         break;
                     skip += limit
@@ -154,7 +157,7 @@ class SumoTable:
         while True:
             matches = self.api.rikishi_matches(r.rikishiId, limit = limit, skip = skip)
             w.all_matches.append(matches)
-            print(f'        +{len(matches)} matches')
+            sys.stdout.write(f'    Adding wrestler:{r.rikishiId} +{len(matches)} matches                                     \r')
             if len(matches) < limit:
                 break
             skip += limit
@@ -166,7 +169,7 @@ class SumoTable:
         return
 
     def _add_torikumi(self, t: SumoTournament, division: SumoDivision, day):
-        print(f'    Add Day {day} Torikumi for {division}')
+        sys.stdout.write(f'    Add Day {day} Torikumi for {division}                                     \n')
 
         # grab the day's torikumi in the givin division
         torikumi = self.api.basho_torikumi(t.id(), division, day)
