@@ -16,11 +16,13 @@ def _decode_datetime(datestr):
 def _decode_date(datestr):
     """ custom decoder for older python versions that only like YYYY-MM-DD """
     #print(f'INPUT:{datestr}')
-    if len(datestr) < 8:
-        datestr = datestr + '01'
+    while len(datestr) < 8:
+        datestr  += '01'
     m = re.match(r'(\d{4})(\d{2})(\d{2})', datestr)
     return date.fromisoformat(f'{m.group(1)}-{m.group(2)}-{m.group(3)}')
 
+def BashoIdStr(bashoId: date):
+    return f'{bashoId.year:04}{bashoId.month:02}'
 
 class SumoDivision(Enum):
     Makuuchi = 'Makuuchi'
@@ -29,6 +31,9 @@ class SumoDivision(Enum):
     Sandanme = 'Sandanme'
     Jonidan = 'Jonidan'
     Jonokuchi = 'Jonokuchi'
+    MaeZumo = 'Mae-zumo'
+
+    UNKNOWN = 'Unknown'
 
     def __repr__(self):
         return self.value
@@ -65,7 +70,7 @@ class SumoResult(Enum):
         return True
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class RikishiMeasurement:
     id: str
     bashoId: int
@@ -78,7 +83,7 @@ class RikishiMeasurement:
 
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class RikishiRank:
     id: str
     bashoId: int
@@ -91,7 +96,7 @@ class RikishiRank:
 
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class RikishiShikona:
     id: str
     bashoId: int
@@ -142,8 +147,6 @@ class Rikishi:
     rankHistory: list[RikishiRank]  = field(default_factory=list)
     shikonaHistory: list[RikishiShikona] = field(default_factory=list)
 
-    stats: RikishiStats = RikishiStats()
-
     def __str__(self):
         s = f'{self.id}: {self.shikonaEn} [{self.heya}]'
         if self.retired():
@@ -165,16 +168,19 @@ class Rikishi:
     def retired(self):
         return True if self.intai.timestamp() > 0 else False
 
-@dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
-class Yusho:
-    division: SumoDivision = field(metadata=dcjson_config(field_name="type"))
-    rikishiId: int
-    shikonaEn: str
-    shikonaJp: str
+    def isValid(self):
+        return self.id > 0
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
+class Yusho:
+    division: SumoDivision = field(metadata=dcjson_config(field_name="type"))
+    rikishiId: int = -1
+    shikonaEn: str = ''
+    shikonaJp: str = ''
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass()
 class SpecialPrize:
     name: str = field(metadata=dcjson_config(field_name="type"))
     rikishiId: int
@@ -182,7 +188,7 @@ class SpecialPrize:
     shikonaJp: str
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class BashoMatch:
     bashoId: date = field(metadata=dcjson_config(decoder=_decode_date))
     division: SumoDivision
@@ -200,8 +206,28 @@ class BashoMatch:
     westRank: str = ''
     kimarite: str = ''
 
+    def __post_init__(self):
+        if self.matchId == '':
+            # matchId format is:
+            #   [bashoId (YYYYMM)]-[day]-[matchNo - 1]-[eastId]-[westId]
+            self.matchId = f'{BashoIdStr(self.bashoId)}-{self.day}-{self.matchNo - 1}-{self.eastId}-{self.westId}'
+        return
+
+    def isValid(self):
+        return self.bashoId.year > 1000
+
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
+class RikishiMatchup:
+    total: int
+    rikishiWins: int
+    opponentWins: int
+    kimariteLosses: dict[str,int] = field(default_factory=dict)
+    kimariteWins: dict[str,int] = field(default_factory=dict)
+    matches: list[BashoMatch] = field(default_factory=list)
+
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass()
 class Basho:
     bashoDate: date = field(metadata=dcjson_config(field_name="date", decoder=_decode_date))
     startDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
@@ -209,26 +235,29 @@ class Basho:
     yusho: list[Yusho] = field(default_factory=list)
     specialPrizes: list[SpecialPrize] = field(default_factory=list)
 
+    def isValid(self):
+        return self.bashoDate.year > 1000
+
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class BashoTorikumi(Basho):
     torikumi: list[BashoMatch] = field(default_factory=list)
+    division: SumoDivision = field(default=SumoDivision.UNKNOWN)
+    day: int = field(default=-1)
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class BanzukeMatchRecord:
     opponentID: int
-    opponentShikonaEn: str
-    opponentShikonaJp: str
     result: SumoResult
     kimarite: str
+    opponentShikonaEn: str = ''
+    opponentShikonaJp: str = ''
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class BanzukeRikishi:
     rikishiId: int = field(metadata=dcjson_config(field_name="rikishiID"))
-    shikonaEn: str
-    shikonaJp: str
     side: str
     rankValue: int
     rank: str
@@ -236,12 +265,16 @@ class BanzukeRikishi:
     losses: int
     absences: int
     record: list[BanzukeMatchRecord]
+    shikonaEn: str = ''
+    shikonaJp: str = ''
 
 @dataclass_json(undefined=Undefined.RAISE)
-@dataclass(frozen=True)
+@dataclass()
 class Banzuke:
     bashoId: date = field(metadata=dcjson_config(decoder=_decode_date))
     division: SumoDivision
     east: list[BanzukeRikishi]
     west: list[BanzukeRikishi]
 
+    def __str__(self):
+        return f'{BashoIdStr(self.bashoId)}:{self.division}'

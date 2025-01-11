@@ -29,10 +29,11 @@ class SumoAPI:
                 params[name] = val
             else:
                 raise Exception('invalid parameter:', name)
-        r = httpx.get(url, params=params)
-        j = r.json()
+        # print(url, params)
+        j = httpx.get(url, params=params).raise_for_status().json()
         if j["total"] < 1:
-            raise Execption("can't find Rikishi with given query parameters")
+            return []
+            #raise Exception("can't find Rikishi with given query parameters")
         # print(j["records"])
         return list(map(Rikishi.from_dict, j["records"]))
 
@@ -49,7 +50,10 @@ class SumoAPI:
             params['ranks']='true'
         if shikonas:
             params['shikonas']='true'
-        r = httpx.get(url, params=params)
+        # print(url, params)
+        r = httpx.get(url, params=params).raise_for_status()
+        if r.status_code == 204 or len(r.text) < 1:
+            return None
         j = r.json()
         # print(j)
         return Rikishi.from_dict(j)
@@ -57,8 +61,8 @@ class SumoAPI:
     def rikishi_stats(self, rikishiId):
         """ GET /api/rikishi/:rikishiId/stats """
         url = self.apiurl + f'/rikishi/{rikishiId}/stats'
-        r = httpx.get(url)
-        j = r.json()
+        # print(url, params)
+        j = httpx.get(url).raise_for_status().json()
         # print(j)
         return RikishiStats.from_dict(j)
 
@@ -73,36 +77,43 @@ class SumoAPI:
             params["bashoId"] = bashoId
         if opponentId:
             url += f'/{int(opponentId)}'
-        r = httpx.get(url, params=params)
-        j = r.json()
+        # print(url, params)
+        j = httpx.get(url, params=params).raise_for_status().json()
         # print(j)
         if j["total"] < 1:
             return []
-        return list(map(BashoMatch.from_dict, j["records"]))
+        if opponentId:
+            matchup = RikishiMatchup.from_dict(j)
+            return matchup.matches
+        else:
+            return list(map(BashoMatch.from_dict, j["records"]))
 
     def basho(self, bashoId):
         """ GET /api/basho/:bashoId """
         url = self.apiurl + f'/basho/{bashoId}'
-        r = httpx.get(url)
-        j = r.json()
+        # print(url)
+        j = httpx.get(url).raise_for_status().json()
         # print(j)
         return Basho.from_dict(j)
 
     def basho_banzuke(self, bashoId, division: SumoDivision):
         """ GET /api/basho/:bashoId/banzuke/:division """
         url = self.apiurl + f'/basho/{bashoId}/banzuke/{division}'
-        r = httpx.get(url)
-        j = r.json()
+        # print(url)
+        j = httpx.get(url).raise_for_status().json()
         # print(j)
         return Banzuke.from_dict(j)
 
     def basho_torikumi(self, bashoId, division: SumoDivision, day: int):
         """ GET /api/basho/:bashoId/torikumi/:division/:day """
         url = self.apiurl + f'/basho/{bashoId}/torikumi/{division}/{day}'
-        r = httpx.get(url)
-        j = r.json()
+        # print(url)
+        j = httpx.get(url).raise_for_status().json()
         # print(j)
-        return BashoTorikumi.from_dict(j)
+        t = BashoTorikumi.from_dict(j)
+        t.division = division
+        t.day = day
+        return t
 
 
 
