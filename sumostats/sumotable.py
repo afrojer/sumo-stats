@@ -40,7 +40,7 @@ class SumoTable:
 
     def load_table(path):
         """ Load a SumoTable from a file """
-        f = file.open(path, 'rb')
+        f = open(path, 'rb')
         try:
             table = pickle.load(f)
         except:
@@ -52,7 +52,7 @@ class SumoTable:
 
     def save_table(self, path):
         """ Save SumoTable instance to a file """
-        f = file.open(path, 'wb')
+        f = open(path, 'wb')
         pickle.dump(self, f)
         f.close()
         return
@@ -81,7 +81,8 @@ class SumoTable:
         # retrieve the set of banzuke for this basho
         if division == SumoDivision.UNKNOWN:
             for div in (SumoDivision):
-                self._add_banzuke(tournament, div.value)
+                if div != SumoDivision.UNKNOWN:
+                    self._add_banzuke(tournament, div.value)
         else:
             self._add_banzuke(tournament, division)
 
@@ -119,22 +120,23 @@ class SumoTable:
         return
 
     def _add_rikishi_banzuke_record(self, r: BanzukeRikishi):
-        if r.rikishiId in self.rikishi:
-            # Assume we've already seen this wrestler
-            return
+        # Check if we've seen this wrestler before
+        if not r.rikishiId in self.rikishi:
+            # Create the SumoWrestler object
+            sys.stdout.write(f'    Adding wrestler:{r.rikishiId}...                                        \r')
+            # find the wrestler
+            rikishi = self.api.rikishi(r.rikishiId, measurements=True, ranks=True)
+            if not rikishi:
+                sys.stderr.write(f'No Rikishi data for "{r.shikonaEn}" ID:{r.rikishiId}\n')
+                # TODO: use self.api.rikishis() and search by shikonaEn?
+                return
 
-        sys.stdout.write(f'    Adding wrestler:{r.rikishiId}...                                        \r')
-        # find the wrestler
-        rikishi = self.api.rikishi(r.rikishiId, measurements=True, ranks=True)
-        if not rikishi:
-            sys.stderr.write(f'No Rikishi data for "{r.shikonaEn}" ID:{r.rikishiId}\n')
-            # TODO: use self.api.rikishis() and search by shikonaEn?
-            return
+            # get some extra stats
+            stats = self.api.rikishi_stats(r.rikishiId)
 
-        # get some extra stats
-        stats = self.api.rikishi_stats(r.rikishiId)
+            self.rikishi[r.rikishiId] = SumoWrestler(rikishi, stats)
 
-        w = SumoWrestler(rikishi, stats)
+        w = self.rikishi[r.rikishiId]
 
         # Add bouts-by-opponent if we don't already have it
         skip = 0
@@ -165,7 +167,6 @@ class SumoTable:
         #
         # TODO: for each match we just found, add it to our global table: self.matches
         #
-        self.rikishi[r.rikishiId] = w
         return
 
     def _add_torikumi(self, t: SumoTournament, division: SumoDivision, day):
