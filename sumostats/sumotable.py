@@ -47,7 +47,9 @@ class SumoTournament():
         self.rikishi: list[int] = []
         self.banzuke: dict[SumoDivision, SumoBanzuke] = {}
 
-        # TODO: de-dup the BashoTorikumi for lower memory usage when un-pickling
+        # TODO: de-dup the BashoTorikumi for lower memory usage when un-pickling?
+
+        # The Torikumi is the list of matches (and results)
         self.torikumi_by_division: dict[SumoDivision, dict[int, BashoTorikumi]] = {}
         self.torikumi_by_day: dict[int, dict[SumoDivision, BashoTorikumi]] = {}
         return
@@ -62,12 +64,13 @@ class SumoTournament():
         # the rikishi fought in this tournament - look through the banzuke to
         # find their record
         for div in (SumoDivision):
-            if div in self.banzuke:
-                r = self.banzuke[div].get_record(rID)
+            if div.value in self.banzuke:
+                r = self.banzuke[div.value].get_record(rID)
                 if r:
-                    return r, div
+                    return r, div.value
 
-        return None
+        sys.stderr.write(f'LookupError: did not find rID:{rID} in any division in {self.id()} (but they competed?)\n')
+        return None, None
 
 class SumoTable:
     """ Build a database of sumo wrestlers and match """
@@ -83,10 +86,20 @@ class SumoTable:
         print(f'SumoTable[rikishi={len(self.rikishi.values())}, basho={len(self.basho.values())}, matches={len(self.matches.values())}]')
         return
 
-    def get_rikishi(self, rikishi):
-        if not rikishi in self.rikishi:
+    def get_rikishi(self, rikishiId):
+        if not rikishiId in self.rikishi:
             return None
-        return self.rikishi[rikishi]
+        return self.rikishi[rikishiId]
+
+    def find_rikishi(self, shikonaEn):
+        for r in self.rikishi:
+            if r.rikishi.shikonaEn == shikonaEn:
+                return r
+        # Try a fuzzy match and return the first thing we find
+        for r in self.rikishi:
+            if shikonaEn in r.rikishi.shikonaEn:
+                return r
+        return None
 
     def get_matchup_record(self, rikishi:int, opponent:int):
         """
@@ -114,20 +127,19 @@ class SumoTable:
                 matchup.kimariteLosses[m.kimarite] += 1
         return matchup
 
-    def get_rikishi_basho_record(self, rikishi, basho):
+    def get_rikishi_basho_record(self, rikishiId, basho):
         """
         Get the record of a rikishi in a specific basho.
         Returns a pair: list[BanzukeRikishi], SumoDivision
         """
-        if not rikishi in self.rikishi:
+        if not rikishiId in self.rikishi:
             return [], SumoDivision.Unknown
 
         bashoDate = BashoDate(basho)
         if not bashoDate in self.basho:
             return [], SumoDivision.Unknown
 
-        b = self.basho[bashoDate]
-        return b.get_rikishi_record(rikishi)
+        return self.basho[bashoDate].get_rikishi_record(rikishiId)
 
     def load_table(path):
         """ Load a SumoTable from a file """
@@ -202,7 +214,6 @@ class SumoTable:
 
         # add the tournament to our table
         self.basho[b.bashoDate] = tournament
-        sys.stdout.write(f'Total Rikishi: {len(self.rikishi.items())}\n')
         return
 
     def _add_banzuke(self, tournament: SumoTournament, division: SumoDivision):
@@ -210,9 +221,11 @@ class SumoTable:
         # Use the API to grab banzuke info
         banzuke = self.api.basho_banzuke(tournament.id(), division)
         if not banzuke:
+            sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
             return
 
         tournament.banzuke[division] = SumoBanzuke(banzuke)
+        sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
 
         max_bouts = 0
 
