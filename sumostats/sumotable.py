@@ -20,8 +20,11 @@ class SumoWrestler():
     def id(self):
         return self.rikishi.id
 
+    def shikonaEn(self):
+        return self.rikishi.shikonaEn
+
     def __str__(self):
-        return f'{self.rikishi.shikonaEn}({self.rikishi.id})'
+        return f'{self.shikonaEn()}({self.rikishi.id})'
 
 class SumoBanzuke():
     def __init__(self, b:Banzuke):
@@ -93,11 +96,11 @@ class SumoTable:
 
     def find_rikishi(self, shikonaEn):
         for r in self.rikishi:
-            if r.rikishi.shikonaEn == shikonaEn:
+            if self.rikishi[r].shikonaEn() == shikonaEn:
                 return r
         # Try a fuzzy match and return the first thing we find
         for r in self.rikishi:
-            if shikonaEn in r.rikishi.shikonaEn:
+            if shikonaEn in self.rikishi[r].shikonaEn():
                 return r
         return None
 
