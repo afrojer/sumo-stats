@@ -10,3 +10,4 @@ source .venv/bin/activate
 chmod 755 .venv/bin/activate
 pip3 install httpx
 pip3 install dataclasses_json
+pip3 install python-dateutil

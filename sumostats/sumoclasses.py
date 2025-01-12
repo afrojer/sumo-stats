@@ -24,6 +24,12 @@ def _decode_date(datestr):
 def BashoIdStr(bashoId: date):
     return f'{bashoId.year:04}{bashoId.month:02}'
 
+def BashoDate(bashoStr: str):
+    while len(bashoStr) < 8:
+        bashoStr += '01'
+    m = re.match(r'(\d{4})(\d{2})(\d{2})', bashoStr)
+    return date.fromisoformat(f'{m.group(1)}-{m.group(2)}-{m.group(3)}')
+
 class SumoDivision(Enum):
     Makuuchi = 'Makuuchi'
     Juryo = 'Juryo'
@@ -219,9 +225,9 @@ class BashoMatch:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class RikishiMatchup:
-    total: int
-    rikishiWins: int
-    opponentWins: int
+    total: int = 0
+    rikishiWins: int = 0
+    opponentWins: int = 0
     kimariteLosses: dict[str,int] = field(default_factory=dict)
     kimariteWins: dict[str,int] = field(default_factory=dict)
     matches: list[BashoMatch] = field(default_factory=list)
@@ -234,6 +240,9 @@ class Basho:
     endDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
     yusho: list[Yusho] = field(default_factory=list)
     specialPrizes: list[SpecialPrize] = field(default_factory=list)
+
+    def id(self):
+        return BashoIdStr(self.bashoDate)
 
     def isValid(self):
         return self.bashoDate.year > 1000
@@ -267,6 +276,9 @@ class BanzukeRikishi:
     record: list[BanzukeMatchRecord] = field(default_factory=list)
     shikonaEn: str = ''
     shikonaJp: str = ''
+
+    def desc(self):
+        return f'{self.shikonaEn}({self.rikishiId})'
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()

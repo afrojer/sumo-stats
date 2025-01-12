@@ -103,13 +103,13 @@ class SumoAPI:
         if not j or not "total" in j or j["total"] < 1:
             sys.stderr.write(f'Could not find Rikishi matches for R:{rikishiId} (basho:{bashoId}, opponent:{opponentId})\n')
             # sys.stderr.write(f'{j}\n')
-            return []
+            return [], None
         # print(j)
         if opponentId:
             matchup = RikishiMatchup.from_dict(j)
-            return matchup.matches
+            return matchup.matches, matchup
         else:
-            return list(map(BashoMatch.from_dict, j["records"]))
+            return list(map(BashoMatch.from_dict, j["records"])), None
 
     def basho(self, bashoId):
         """ GET /api/basho/:bashoId """
