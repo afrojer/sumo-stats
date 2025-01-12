@@ -120,7 +120,11 @@ class SumoAPI:
             # sys.stderr.write(f'{j}\n')
             return None
         # print(j)
-        return Basho.from_dict(j)
+        try:
+            return Basho.from_dict(j)
+        except KeyError as ke:
+            sys.stderr.write(f'KeyError in basho json:\n{j}\n')
+            raise ke
 
     def basho_banzuke(self, bashoId, division: SumoDivision):
         """ GET /api/basho/:bashoId/banzuke/:division """

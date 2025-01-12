@@ -67,7 +67,7 @@ def BuildBigTable(sumotable):
     while curDate < endDate:
         bStart = curDate
         bEnd = curDate + relativedelta(years=1)
-        sumotable.build_table_from_date(bStart, bEnd)
+        sumotable.build_table_from_dates(bStart, bEnd)
         # create new files after each year just to see the progress
         fname = f'sumodata_{BashoIdStr(startDate)}_{BashoIdStr(bEnd)}.pickle'
         print(f'Saving Data in {fname}')

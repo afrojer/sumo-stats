@@ -78,11 +78,11 @@ class SumoResult(Enum):
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class RikishiMeasurement:
-    id: str
-    bashoId: int
-    rikishiId: int
-    height: int
-    weight: int
+    id: str = ''
+    bashoId: int = -1
+    rikishiId: int = -1
+    height: float = 0.0
+    weight: float = 0.0
 
     def __str__(self):
         return f'{self.bashoId}:({self.height},{self.weight})'
@@ -91,11 +91,11 @@ class RikishiMeasurement:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class RikishiRank:
-    id: str
-    bashoId: int
-    rikishiId: int
-    rankValue: int
-    rank: str
+    id: str = ''
+    bashoId: int = -1
+    rikishiId: int = -1
+    rankValue: int = -1
+    rank: str = ''
 
     def __str__(self):
         return f'{self.bashoId}:{self.rank}({self.rankValue})'
@@ -104,11 +104,11 @@ class RikishiRank:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class RikishiShikona:
-    id: str
-    bashoId: int
-    rikishiId: int
-    shikonaEn: str
-    shikonaJp: str
+    id: str = ''
+    bashoId: int = -1
+    rikishiId: int = -1
+    shikonaEn: str = ''
+    shikonaJp: str = ''
 
     def __str__(self):
         return f'{self.bashoId}:{self.shikonaEn}'
@@ -118,16 +118,16 @@ class RikishiShikona:
 @dataclass()
 class RikishiStats:
     absenceByDivision: dict[SumoDivision, int] = field(default_factory=dict)
-    totalBasho: int = field(default=-1, metadata=dcjson_config(field_name="basho"))
+    totalBasho: int = field(default=0, metadata=dcjson_config(field_name="basho"))
     bashoByDivision: dict[SumoDivision, int] = field(default_factory=dict)
     lossByDivision: dict[SumoDivision, int] = field(default_factory=dict)
-    totalAbsences: int = -1
+    totalAbsences: int = 0
     totalByDivision: dict[SumoDivision, int] = field(default_factory=dict)
-    totalMatches: int = -1
-    totalLosses: int = -1
-    totalWins: int = -1
+    totalMatches: int = 0
+    totalLosses: int = 0
+    totalWins: int = 0
     winsByDivision: dict[SumoDivision, int] = field(default_factory=dict)
-    yusho: int = -1
+    yusho: int = 0
     yushoByDivision: dict[SumoDivision, int] = field(default_factory=dict)
     specialPrizes: dict[str, int] = field(default_factory=dict, metadata=dcjson_config(field_name="sansho"))
 
@@ -189,24 +189,24 @@ class Yusho:
 @dataclass()
 class SpecialPrize:
     name: str = field(metadata=dcjson_config(field_name="type"))
-    rikishiId: int
-    shikonaEn: str
-    shikonaJp: str
+    rikishiId: int = -1
+    shikonaEn: str = ''
+    shikonaJp: str = ''
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class BashoMatch:
     bashoId: date = field(metadata=dcjson_config(decoder=_decode_date))
-    division: SumoDivision
-    day: int
-    matchNo: int
-    eastId: int
-    eastShikona: str
-    westId: int
-    westShikona: str
-    winnerId: int
-    winnerEn: str
-    winnerJp: str
+    division: SumoDivision = SumoDivision.UNKNOWN
+    day: int = -1
+    matchNo: int = -1
+    eastId: int = -1
+    eastShikona: str = ''
+    westId: int = -1
+    westShikona: str = ''
+    winnerId: int = -1
+    winnerEn: str = ''
+    winnerJp: str = ''
     matchId: str = field(default='', metadata=dcjson_config(field_name="id"))
     eastRank: str = ''
     westRank: str = ''
@@ -240,6 +240,7 @@ class Basho:
     endDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
     yusho: list[Yusho] = field(default_factory=list)
     specialPrizes: list[SpecialPrize] = field(default_factory=list)
+    location: str = ''
 
     def id(self):
         return BashoIdStr(self.bashoDate)
@@ -258,8 +259,8 @@ class BashoTorikumi(Basho):
 @dataclass()
 class BanzukeMatchRecord:
     opponentID: int
-    result: SumoResult
-    kimarite: str
+    result: SumoResult = SumoResult.UNKNOWN
+    kimarite: str = ''
     opponentShikonaEn: str = ''
     opponentShikonaJp: str = ''
 

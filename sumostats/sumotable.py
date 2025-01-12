@@ -97,11 +97,11 @@ class SumoTable:
     def find_rikishi(self, shikonaEn):
         for r in self.rikishi:
             if self.rikishi[r].shikonaEn() == shikonaEn:
-                return r
+                return self.rikishi[r]
         # Try a fuzzy match and return the first thing we find
         for r in self.rikishi:
             if shikonaEn in self.rikishi[r].shikonaEn():
-                return r
+                return self.rikishi[r]
         return None
 
     def get_matchup_record(self, rikishi:int, opponent:int):
@@ -251,10 +251,10 @@ class SumoTable:
 
         return
 
-    def _add_rikishi_banzuke_record(self, r: BanzukeRikishi, tournament: SumoTournament):
+    def _add_rikishi_banzuke_record(self, r: BanzukeRikishi, tournament: SumoTournament, force_update=False):
         # Check if we've seen this wrestler before
         if not r.rikishiId in self.rikishi:
-            if not self._add_rikishi(r.rikishiId, r.desc()):
+            if not self._add_rikishi(r.rikishiId, r.shikonaEn, r.desc()):
                 return
             #
             # TODO: for each match we just found, add it to our global table: self.matches
@@ -276,7 +276,7 @@ class SumoTable:
         limit = 1000
         for record in r.record:
             # Add this wrestler's record vs. the opponent
-            if record.opponentID > 0 and not record.opponentID in w.matches_by_opponent:
+            if record.opponentID > 0 and (force_update or not record.opponentID in w.matches_by_opponent):
                 w.matches_by_opponent[record.opponentID] = []
                 while True:
                     matches, matchup = self.api.rikishi_matches(r.rikishiId, opponentId = record.opponentID, limit = limit, skip = skip)
@@ -291,19 +291,22 @@ class SumoTable:
 
         return
 
-    def _add_rikishi(self, rikishiId, desc):
+    def _add_rikishi(self, rikishiId, shikonaEn, desc):
         # Create the SumoWrestler object
         # find the wrestler
         rikishi = self.api.rikishi(rikishiId, measurements=True, ranks=True)
         if not rikishi:
-            sys.stderr.write(f'No Rikishi data for "{desc}"\n')
+            sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
+            rikishi = Rikishi(id=rikishiId, shikonaEn=shikonaEn)
             # TODO: use self.api.rikishis() and search by shikonaEn?
-            return False
 
         sys.stdout.write(f'    Adding wrestler:{desc}...{" "*50}\n')
 
         # get some extra stats
         stats = self.api.rikishi_stats(rikishiId)
+        if not stats:
+            sys.stderr.write(f'Cannot find stats for {desc}: creating blank entry')
+            stats = RikishiStats()
 
         all_matches = []
 
