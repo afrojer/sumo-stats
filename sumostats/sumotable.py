@@ -221,11 +221,11 @@ class SumoTable:
         # Use the API to grab banzuke info
         banzuke = self.api.basho_banzuke(tournament.id(), division)
         if not banzuke:
-            sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
+            # sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
             return
 
         tournament.banzuke[division] = SumoBanzuke(banzuke)
-        sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
+        # sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
 
         max_bouts = 0
 
