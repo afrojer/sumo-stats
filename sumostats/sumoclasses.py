@@ -39,7 +39,7 @@ class SumoDivision(Enum):
     Jonokuchi = 'Jonokuchi'
     MaeZumo = 'Mae-zumo'
 
-    UNKNOWN = 'Unknown'
+    UNKNOWN = ''
 
     def __repr__(self):
         return self.value
@@ -285,9 +285,18 @@ class BanzukeRikishi:
 @dataclass()
 class Banzuke:
     bashoId: date = field(metadata=dcjson_config(decoder=_decode_date))
-    division: SumoDivision
-    east: list[BanzukeRikishi]
-    west: list[BanzukeRikishi]
+    division: SumoDivision = SumoDivision.UNKNOWN
+    east: list[BanzukeRikishi] = field(default_factory=list)
+    west: list[BanzukeRikishi] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.east:
+            self.east = []
+        if not self.west:
+            self.west = []
 
     def __str__(self):
         return f'{BashoIdStr(self.bashoId)}:{self.division}'
+
+    def isValid(self):
+        return self.bashoId.year > 1000

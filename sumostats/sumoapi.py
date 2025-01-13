@@ -6,6 +6,8 @@ from .sumoclasses import *
 
 class SumoAPI:
     """ Object wrapper around sumo-api.com API calls """
+    # set to True to verbose-log received json
+    _DEBUG = False
 
     def __init__(self):
         self.apiurl = "https://sumo-api.com/api"
@@ -24,7 +26,11 @@ class SumoAPI:
 
         # check to see if this is valid json (takes at least 2 bytes)
         if r.status_code == 204 or len(r.text) < 2:
+            if SumoAPI._DEBUG:
+                sys.stderr.write(f'GET {url} params:{params} received 204: text="{r.text}"\n')
             return None
+        if SumoAPI._DEBUG:
+            sys.stderr.write(f'GET {url} params:{params}\nRESPONSE:{r.text}\n')
         return r.json()
 
     def rikishis(self, limit = 1000, skip = 0, retired = False, **query):
@@ -55,7 +61,6 @@ class SumoAPI:
         if not "records" in j:
             sys.stderr.write(f'"records" not in json response"\n{j}\n')
             return []
-        # print(j)
         return list(map(Rikishi.from_dict, j["records"]))
 
     def rikishi(self, rikishiId, measurements = False, ranks = False, shikonas = False):
@@ -74,8 +79,8 @@ class SumoAPI:
 
         j = self._get_json(url, params)
         if not j:
+            sys.stderr.write(f'Could not find rikishi:{rikishiId}\n')
             return None
-        # print(j)
         return Rikishi.from_dict(j)
 
     def rikishi_stats(self, rikishiId):
@@ -83,8 +88,8 @@ class SumoAPI:
         url = self.apiurl + f'/rikishi/{rikishiId}/stats'
         j = self._get_json(url, {})
         if not j:
+            sys.stderr.write(f'Could not find stats for rikishi:{rikishiId}\n')
             return None
-        # print(j)
         return RikishiStats.from_dict(j)
 
     def rikishi_matches(self, rikishiId, bashoId = None, opponentId = None, limit = 0, skip = 0):
@@ -102,9 +107,8 @@ class SumoAPI:
         j = self._get_json(url, params)
         if not j or not "total" in j or j["total"] < 1:
             sys.stderr.write(f'Could not find Rikishi matches for R:{rikishiId} (basho:{bashoId}, opponent:{opponentId})\n')
-            # sys.stderr.write(f'{j}\n')
+            sys.stderr.write(f'json:{j}\n')
             return [], None
-        # print(j)
         if opponentId:
             matchup = RikishiMatchup.from_dict(j)
             return matchup.matches, matchup
@@ -117,9 +121,8 @@ class SumoAPI:
         j = self._get_json(url, {})
         if not j or not "date" in j:
             sys.stderr.write(f'Could not find basho:{bashoId}\n')
-            # sys.stderr.write(f'{j}\n')
+            sys.stderr.write(f'json:{j}\n')
             return None
-        # print(j)
         try:
             return Basho.from_dict(j)
         except KeyError as ke:
@@ -131,11 +134,24 @@ class SumoAPI:
         url = self.apiurl + f'/basho/{bashoId}/banzuke/{division}'
         j = self._get_json(url, {})
         if not j or not "bashoId" in j:
-            sys.stderr.write(f'Could not find banzuke for basho:{bashoId}\n')
-            # sys.stderr.write(f'{j}\n')
-            return None
-        # print(j)
-        return Banzuke.from_dict(j)
+            sys.stderr.write(f'Could not find {division} banzuke for basho:{bashoId} -- Creating empty banzuke.\n')
+            sys.stderr.write(f'{j}\n')
+            b = Banzuke(bashoId=BashoDate(bashoId))
+            b.division = division
+            return b
+        try:
+            b = Banzuke.from_dict(j)
+            if not b or not b.isValid():
+                sys.stderr.write(f'Error parsing {division} banzuke for basho:{bashoId} -- Creating empty banzuke\n')
+                b = Banzuke(bashoId=BashoDate(bashoId))
+                b.division = division
+            return b
+        except KeyError as ke:
+            sys.stderr.write(f'KeyError in banzuke json:\n{j}\n')
+            raise ke
+        except ValueError as ve:
+            sys.stderr.write(f'ValueError in banzuke json:\n{j}\n')
+            raise ve
 
     def basho_torikumi(self, bashoId, division: SumoDivision, day: int):
         """ GET /api/basho/:bashoId/torikumi/:division/:day """
@@ -145,7 +161,6 @@ class SumoAPI:
             sys.stderr.write(f'Could not find torikumi for basho:{bashoId}\n')
             # sys.stderr.write(f'{j}\n')
             return None
-        # print(j)
         t = BashoTorikumi.from_dict(j)
         t.division = division
         t.day = day

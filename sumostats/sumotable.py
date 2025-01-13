@@ -33,10 +33,12 @@ class SumoBanzuke():
         self.rikishi: dict[int, BanzukeRikishi] = {}
 
         # re-index the Banzuki records into something more easily queried
-        for r in b.east:
-            self.rikishi[r.rikishiId] = r
-        for r in b.west:
-            self.rikishi[r.rikishiId] = r
+        if b.east:
+            for r in b.east:
+                self.rikishi[r.rikishiId] = r
+        if b.west:
+            for r in b.west:
+                self.rikishi[r.rikishiId] = r
         return
 
     def get_record(self, rID):
@@ -76,7 +78,7 @@ class SumoTournament():
         return None, None
 
 class SumoTable:
-    """ Build a database of sumo wrestlers and match """
+    """ Build a database of sumo wrestlers and match data """
 
     def __init__(self):
         self.api = SumoAPI()
@@ -85,6 +87,10 @@ class SumoTable:
         self.matches: dict[str, BashoMatch] = {}
         return
 
+    """
+    Public Methods
+
+    """
     def print_table_stats(self):
         print(f'SumoTable[rikishi={len(self.rikishi.values())}, basho={len(self.basho.values())}, matches={len(self.matches.values())}]')
         return
@@ -144,6 +150,9 @@ class SumoTable:
 
         return self.basho[bashoDate].get_rikishi_record(rikishiId)
 
+    def get_rikishi_basho_record_by_day(self, rikishiId, basho, day):
+        return
+
     def load_table(path):
         """ Load a SumoTable from a file """
         f = open(path, 'rb')
@@ -163,7 +172,19 @@ class SumoTable:
         f.close()
         return
 
-    def build_table_from_dates(self, startDate: date, endDate: date, division: SumoDivision = SumoDivision.UNKNOWN):
+    def update_basho(self, bashoDate: date, division: SumoDivision = SumoDivision.UNKNOWN):
+        """
+        Update information in the table with date pulled fresh from the API data source.
+        This is most useful for in-progress tournaments.
+        """
+        basho = self.api.basho(BashoIdStr(bashoDate))
+        if not basho or not basho.isValid():
+            sys.stderr.write(f'Could not query basho:{bashoId}\n')
+            return
+        self._add_basho(basho, division, forceUpdate=True)
+        return
+
+    def add_basho_by_date_range(self, startDate: date, endDate: date, division: SumoDivision = SumoDivision.UNKNOWN):
         # sanity check the dates
         if endDate < startDate:
             raise Exception('endDate:{endDate} must be later than startDate:{startDate}')
@@ -195,55 +216,72 @@ class SumoTable:
             basho = self.api.basho(BashoIdStr(bashoDate))
         return
 
-    def _add_basho(self, b: Basho, division: SumoDivision):
+    """
+    Private Methods
+
+    """
+
+    def _add_basho(self, b: Basho, division: SumoDivision, forceUpdate = False):
         if not b or not b.isValid():
             return
+
+        tournament = None
         if b.bashoDate in self.basho:
             # Assume we already know about this one
-            sys.stderr.write(f'Skipping tournament: {b.id()} (already in table)\n')
-            return
-
-        sys.stdout.write(f'Add New SumoTournament: {b.id()}\n')
-        # Add this basho to our table as a set of Tournament objects
-        tournament = SumoTournament(b)
+            if not forceUpdate:
+                sys.stderr.write(f'Skipping tournament: {b.id()} (already in table)\n')
+                return
+            sys.stderr.write(f'Updating tournament: {b.id()} (from API source)\n')
+            tournament = self.basho[b.bashoDate]
+            tournament.basho = b
+        else:
+            sys.stdout.write(f'Add New SumoTournament: {b.id()}\n')
+            # Add this basho to our table as a set of Tournament objects
+            tournament = SumoTournament(b)
 
         # retrieve the set of banzuke for this basho
         if division == SumoDivision.UNKNOWN:
             for div in (SumoDivision):
                 if div != SumoDivision.UNKNOWN:
-                    self._add_banzuke(tournament, div.value)
+                    self._add_banzuke(tournament, div.value, forceUpdate)
         else:
-            self._add_banzuke(tournament, division)
+            self._add_banzuke(tournament, division, forceUpdate)
 
         # add the tournament to our table
         self.basho[b.bashoDate] = tournament
         return
 
-    def _add_banzuke(self, tournament: SumoTournament, division: SumoDivision):
-        sys.stdout.write(f'New Banzuke for {division}\n')
+    def _add_banzuke(self, tournament: SumoTournament, division: SumoDivision, forceUpdate = False):
+        sys.stdout.write(f'Query Banzuke for {division} (in {tournament.id()})\n')
         # Use the API to grab banzuke info
         banzuke = self.api.basho_banzuke(tournament.id(), division)
         if not banzuke:
-            # sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
+            sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id()}')
             return
 
+        # Updates will just replace the banzuke
         tournament.banzuke[division] = SumoBanzuke(banzuke)
-        # sys.stdout.write(f'Basho now has {len(tournament.banzuke.keys())} Banzuke: {tournament.banzuke.keys()}\n')
 
         max_bouts = 0
 
         # iterate over banzuke Rikishi
-        for rikishi in banzuke.east:
-            self._add_rikishi_banzuke_record(rikishi, tournament)
-            bouts = rikishi.wins + rikishi.losses + rikishi.absences
-            if bouts > max_bouts:
-                max_bouts = bouts
+        if banzuke.east:
+            for rikishi in banzuke.east:
+                self._add_rikishi_banzuke_record(rikishi, tournament, forceUpdate)
+                bouts = rikishi.wins + rikishi.losses + rikishi.absences
+                if bouts > max_bouts:
+                    max_bouts = bouts
+        else:
+            sys.stderr.write(f'No east side in banzuke:{banzuke}\n')
 
-        for rikishi in banzuke.west:
-            self._add_rikishi_banzuke_record(rikishi, tournament)
-            bouts = rikishi.wins + rikishi.losses + rikishi.absences
-            if bouts > max_bouts:
-                max_bouts = bouts
+        if banzuke.west:
+            for rikishi in banzuke.west:
+                self._add_rikishi_banzuke_record(rikishi, tournament, forceUpdate)
+                bouts = rikishi.wins + rikishi.losses + rikishi.absences
+                if bouts > max_bouts:
+                    max_bouts = bouts
+        else:
+            sys.stderr.write(f'No west side in banzuke:{banzuke}\n')
 
         # For each day of the tournament, add the torikumi
         for day in range(1, max_bouts+1):
@@ -256,11 +294,8 @@ class SumoTable:
         if not r.rikishiId in self.rikishi:
             if not self._add_rikishi(r.rikishiId, r.shikonaEn, r.desc()):
                 return
-            #
-            # TODO: for each match we just found, add it to our global table: self.matches
-            #
-        else:
-            sys.stderr.write(f'    Found existing record for {r.desc()}\n')
+        # else:
+        #     sys.stderr.write(f'    Found existing record for {r.desc()}\n')
 
         # Add this wrestler to the list of wrestlers in the tournament
         if not r.rikishiId in tournament.rikishi:

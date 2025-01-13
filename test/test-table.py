@@ -27,8 +27,8 @@ def TestTable():
         sumotable = SumoTable()
     sumotable.print_table_stats()
 
-    sumotable.build_table_from_dates(date(2024,4,23), date(2024,6,21))
-    # sumotable.build_table_from_dates(date(2024,4,23), date(2024,6,21), SumoDivision.Makuuchi)
+    sumotable.add_basho_by_date_range(date(2024,4,23), date(2024,6,21))
+    # sumotable.add_basho_by_date_range(date(2024,4,23), date(2024,6,21), SumoDivision.Makuuchi)
     sumotable.save_table('./sumo_data.pickle')
     sumotable.print_table_stats()
 
@@ -55,19 +55,38 @@ def TestTable():
 
     return sumotable
 
-def BuildBigTable(sumotable):
+def BuildBigTable(sumotable = None, preload_file = './sumodata_200001_201212.pickle'):
     startDate = date(2000,1,1)
     endDate = date(2024,12,31)
 
-    curDate = startDate
+    curDate = date(2013,1,1) # startDate
 
-    sumotable = SumoTable()
+    if not sumotable:
+        if os.path.isfile(preload_file):
+            print(f'Loading data from {preload_file}...')
+            try:
+                sumotable = SumoTable.load_table(preload_file)
+            except:
+                sumotable = SumoTable()
+                sys.stderr.write(f'Error loading data from {preload_file}...')
+                pass
+        else:
+            sumotable = SumoTable()
+
+    sumotable.print_table_stats()
+
+    # Try to load the 201103 basho b/c it's all goofed up
+    print(f'Trying to update 201103...')
+    sumotable.add_basho_by_date_range(date(2011,2,1), date(2011,4,1))
+    sumotable.update_basho(date(2011,3,1))
+    sumotable.print_table_stats()
 
     # run through the date range in year increments and save after each year
     while curDate < endDate:
         bStart = curDate
         bEnd = curDate + relativedelta(years=1)
-        sumotable.build_table_from_dates(bStart, bEnd)
+        sumotable.add_basho_by_date_range(bStart, bEnd)
+        sumotable.print_table_stats()
         # create new files after each year just to see the progress
         fname = f'sumodata_{BashoIdStr(startDate)}_{BashoIdStr(bEnd)}.pickle'
         print(f'Saving Data in {fname}')
@@ -76,5 +95,6 @@ def BuildBigTable(sumotable):
 
     return
 
-t = TestTable()
-BuildBigTable(t)
+# t = TestTable()
+# BuildBigTable(t)
+BuildBigTable()
