@@ -8,18 +8,10 @@ sys.path.append(cdir+'/../')
 from sumostats.sumoapi import *
 from sumostats.sumodata import *
 
-def PrintRikishi(rinput):
-    # print(rinput)
-    if hasattr(rinput, '__len__'):
-        for r in rinput:
-            print(r)
-    else:
-        print(rinput)
-
 def TestBasicDataAPIs():
     sumodata = None
     try:
-        sumodata = SumoData.load_data('./basho_202405.pickle')
+        sumodata = SumoData.load_data('./sumo_data.pickle')
     except:
         pass
 
@@ -27,39 +19,37 @@ def TestBasicDataAPIs():
         sumodata = SumoData()
     sumodata.print_table_stats()
 
-    sumodata.add_basho_by_date_range(date(2024,4,23), date(2024,6,21))
-    # sumodata.add_basho_by_date_range(date(2024,4,23), date(2024,6,21), SumoDivision.Makuuchi)
+    # Try to build a rankValue table from all the rikshi in a basho
+    basholist = []
+    basholist.append(sumodata.get_basho('202405', fetch=True))
+    basholist.append(sumodata.get_basho('202411', fetch=True))
+    basholist.append(sumodata.get_basho('202501', fetch=True))
     sumodata.save_data('./sumo_data.pickle')
     sumodata.print_table_stats()
 
-    # get Hokutofuji (id=27) record in the basho that should be in the table now
-    hokutofuji = sumodata.get_rikishi(27)
-    if hokutofuji:
-        record, division = sumodata.get_rikishi_basho_record(hokutofuji.id(), '202405')
-        print(f'\n{hokutofuji}: {division}\nRecord: {record}\n')
-    else:
-        print('Where is Hokutofuji?!')
+    rankMap: dict[str, int] = {}
+    def updateranks(basho):
+        for r in basho.rikishi:
+            w = sumodata.get_rikishi(r)
+            history = w.get_rank_history()
+            for rank in history:
+                if rank.rankValue > 0 and not rank.rank in rankMap:
+                    rankMap[rank.rank] = rank.rankValue
 
-    ichiyamamoto = sumodata.get_rikishi(11)
-    if ichiyamamoto:
-        matchup = sumodata.get_matchup_record(hokutofuji.id(), ichiyamamoto.id())
-        print(f'\n{hokutofuji} vs {ichiyamamoto}:\n{matchup}\n')
-    else:
-        print('Where is Ichiyamamoto?!')
+    for basho in basholist:
+        updateranks(basho)
 
-    ura = sumodata.find_rikishi('Ura')
-    if ura:
-        print(f'\nLOOKUP: {ura}\n')
-    else:
-        print('Where is Ura?!')
+    print('Sorting Sumo Ranks...')
+    for r in dict(sorted(rankMap.items(), key=lambda item: item[1])).items():
+        print(f'    "{r[0]}": {r[1]}')
 
     return sumodata
 
 def BuildBigTable(sumodata = None, preload_file = './sumodata_200001_201212.pickle'):
     startDate = date(2000,1,1)
-    endDate = date(2024,11,30)
+    endDate = date(2024,12,31)
 
-    curDate = startDate # date(2013,1,1) # startDate
+    curDate = date(2013,1,1) # startDate
 
     if not sumodata:
         if os.path.isfile(preload_file):
@@ -95,6 +85,6 @@ def BuildBigTable(sumodata = None, preload_file = './sumodata_200001_201212.pick
 
     return
 
-#t = TestBasicDataAPIs()
+t = TestBasicDataAPIs()
 # BuildBigTable(t)
-BuildBigTable()
+#BuildBigTable()
