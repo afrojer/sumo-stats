@@ -12,7 +12,7 @@ class SumoWrestler():
         self.rikishi: Rikishi = r
         self.stats: RikishiStats = s
 
-        # 'str' is the matchId: data can be found in the SumoTable.matches
+        # 'str' is the matchId: data can be found in the SumoData.matches
         self.all_matches: list[str] = []
         self.matches_by_opponent: dict[int, list[str]] = {}
         return
@@ -77,7 +77,7 @@ class SumoTournament():
         sys.stderr.write(f'LookupError: did not find rID:{rID} in any division in {self.id()} (but they competed?)\n')
         return None, None
 
-class SumoTable:
+class SumoData:
     """ Build a database of sumo wrestlers and match data """
 
     def __init__(self):
@@ -92,7 +92,7 @@ class SumoTable:
 
     """
     def print_table_stats(self):
-        print(f'SumoTable[rikishi={len(self.rikishi.values())}, basho={len(self.basho.values())}, matches={len(self.matches.values())}]')
+        print(f'SumoData[rikishi={len(self.rikishi.values())}, basho={len(self.basho.values())}, matches={len(self.matches.values())}]')
         return
 
     def get_rikishi(self, rikishiId):
@@ -153,20 +153,20 @@ class SumoTable:
     def get_rikishi_basho_record_by_day(self, rikishiId, basho, day):
         return
 
-    def load_table(path):
-        """ Load a SumoTable from a file """
+    def load_data(path):
+        """ Load a SumoData from a file """
         f = open(path, 'rb')
         try:
             table = pickle.load(f)
         except:
             table = None
         f.close()
-        if not isinstance(table, SumoTable):
-            raise Exception(f'Invalid saved table file at {path}: not a SumoTable')
+        if not isinstance(table, SumoData):
+            raise Exception(f'Invalid saved table file at {path}: not a SumoData')
         return table
 
-    def save_table(self, path):
-        """ Save SumoTable instance to a file """
+    def save_data(self, path):
+        """ Save SumoData instance to a file """
         f = open(path, 'wb')
         pickle.dump(self, f)
         f.close()
