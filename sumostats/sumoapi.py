@@ -106,8 +106,9 @@ class SumoAPI:
         # print(url, params)
         j = self._get_json(url, params)
         if not j or not "total" in j or j["total"] < 1:
-            sys.stderr.write(f'Could not find Rikishi matches for R:{rikishiId} (basho:{bashoId}, opponent:{opponentId})\n')
-            sys.stderr.write(f'json:{j}\n')
+            if SumoAPI._DEBUG:
+                sys.stderr.write(f'Could not find Rikishi matches for R:{rikishiId} (basho:{bashoId}, opponent:{opponentId})\n')
+                sys.stderr.write(f'json:{j}\n')
             return [], None
         if opponentId:
             matchup = RikishiMatchup.from_dict(j)
@@ -158,8 +159,9 @@ class SumoAPI:
         url = self.apiurl + f'/basho/{bashoId}/torikumi/{division}/{day}'
         j = self._get_json(url, {})
         if not j or not "torikumi" in j:
-            sys.stderr.write(f'Could not find torikumi for basho:{bashoId}\n')
-            # sys.stderr.write(f'{j}\n')
+            if SumoAPI._DEBUG:
+                sys.stderr.write(f'Could not find torikumi for basho:{bashoId}\n')
+                sys.stderr.write(f'{j}\n')
             return None
         t = BashoTorikumi.from_dict(j)
         t.division = division

@@ -17,14 +17,18 @@ class SumoWrestler():
         self.matches_by_opponent: dict[int, list[str]] = {}
         return
 
+    def __str__(self):
+        return f'{self.shikonaEn()}({self.rikishi.id})'
+
     def id(self):
         return self.rikishi.id
 
     def shikonaEn(self):
         return self.rikishi.shikonaEn
 
-    def __str__(self):
-        return f'{self.shikonaEn()}({self.rikishi.id})'
+    def get_rank_history(self) -> list[RikishiRank]:
+        return self.rikishi.rankHistory
+        return
 
 class SumoBanzuke():
     def __init__(self, b:Banzuke):
@@ -55,14 +59,43 @@ class SumoTournament():
         # TODO: de-dup the BashoTorikumi for lower memory usage when un-pickling?
 
         # The Torikumi is the list of matches (and results)
-        self.torikumi_by_division: dict[SumoDivision, dict[int, BashoTorikumi]] = {}
-        self.torikumi_by_day: dict[int, dict[SumoDivision, BashoTorikumi]] = {}
+        self.torikumi_by_division: dict[SumoDivision, dict[int, list[BashoMatch]]] = {}
+        self.torikumi_by_day: dict[int, dict[SumoDivision, list[BashoMatch]]] = {}
         return
 
     def id(self):
         return self.basho.id()
 
-    def get_rikishi_record(self, rID: int):
+    def get_banzuke(division: SumoDivision) -> SumoBanzuke:
+        if not division in self.banzuke:
+            return None
+        return self.banzuke[division]
+
+    def get_bouts_by_day_in_division(self, division) -> dict[int, list[BashoMatch]]:
+        if division not in self.torikumi_by_division:
+            return None
+        return self.torikumi_by_division[division]
+
+    def get_bouts_by_division_on_day(self, day) -> dict[SumoDivision, list[BashoMatch]]:
+        if not day in self.torikumi_by_day:
+            return None
+        return self.torikumi_by_day[day]
+
+    def get_upcoming_bouts(self, division) -> {int, list[BashoMatch]}:
+        bouts = self.get_bouts_by_day_in_division(division)
+        if not bouts:
+            return 0, None
+        for day in sorted(bouts.keys()):
+            matchlist = bouts[day]
+            print(f'Day {day} bouts:{len(matchlist)}')
+            if len(matchlist) > 0 and matchlist[0].upcoming():
+                return day, matchlist
+        return 0, None
+
+    def get_rikishi_record(self, rID: int) -> BanzukeRikishi:
+        """
+        Retrieve the 
+        """
         if not rID in self.rikishi:
             return None, None
 
@@ -95,7 +128,15 @@ class SumoData:
         print(f'SumoData[rikishi={len(self.rikishi.values())}, basho={len(self.basho.values())}, matches={len(self.matches.values())}]')
         return
 
-    def get_rikishi(self, rikishiId):
+    def get_basho(self, bashoStr, division=SumoDivision.UNKNOWN, fetch=False) -> SumoTournament:
+        d = BashoDate(bashoStr)
+        if fetch:
+            self.update_basho(d, division=division)
+        if not d in self.basho:
+            return None
+        return self.basho[d]
+
+    def get_rikishi(self, rikishiId) -> SumoWrestler:
         if not rikishiId in self.rikishi:
             return None
         return self.rikishi[rikishiId]
@@ -116,7 +157,12 @@ class SumoData:
         """
         if not rikishi in self.rikishi:
             return None
-        matchlist = self.rikishi[rikishi].matches_by_opponent[opponent]
+
+        opponentlist = self.rikishi[rikishi].matches_by_opponent
+
+        matchlist = None
+        if opponent in opponentlist:
+            matchlist = opponentlist[opponent]
         if not matchlist:
             return None
 
@@ -268,18 +314,22 @@ class SumoData:
         if banzuke.east:
             for rikishi in banzuke.east:
                 self._add_rikishi_banzuke_record(rikishi, tournament, forceUpdate)
-                bouts = rikishi.wins + rikishi.losses + rikishi.absences
-                if bouts > max_bouts:
-                    max_bouts = bouts
+                if max_bouts < len(rikishi.record):
+                    max_bouts = len(rikishi.record)
+                #bouts = rikishi.wins + rikishi.losses + rikishi.absences
+                #if bouts > max_bouts:
+                #    max_bouts = bouts
         else:
             sys.stderr.write(f'No east side in banzuke:{banzuke}\n')
 
         if banzuke.west:
             for rikishi in banzuke.west:
                 self._add_rikishi_banzuke_record(rikishi, tournament, forceUpdate)
-                bouts = rikishi.wins + rikishi.losses + rikishi.absences
-                if bouts > max_bouts:
-                    max_bouts = bouts
+                if max_bouts < len(rikishi.record):
+                    max_bouts = len(rikishi.record)
+                #bouts = rikishi.wins + rikishi.losses + rikishi.absences
+                #if bouts > max_bouts:
+                #    max_bouts = bouts
         else:
             sys.stderr.write(f'No west side in banzuke:{banzuke}\n')
 
@@ -295,7 +345,7 @@ class SumoData:
             if not self._add_rikishi(r.rikishiId, r.shikonaEn, r.desc()):
                 return
         # else:
-        #     sys.stderr.write(f'    Found existing record for {r.desc()}\n')
+        #     sys.stderr.write(f'    Found existing record for {r.desc()}{" "*40}\n')
 
         # Add this wrestler to the list of wrestlers in the tournament
         if not r.rikishiId in tournament.rikishi:
@@ -307,12 +357,16 @@ class SumoData:
         # Update the rikishi record with bouts-by-opponent
         # (if we don't already have it)
         #
-        skip = 0
-        limit = 1000
         for record in r.record:
+            # Add the opponent if we haven't seen them before
+            if not record.opponentID in self.rikishi:
+                if not self._add_rikishi(record.opponentID, record.opponentShikonaEn, f'{record.opponentShikonaEn}({record.opponentID})'):
+                    sys.stderr.write(f'Could not add opponent ({record.opponentShikonaEn}[{record.opponentID}]) of {r.desc()}\n')
             # Add this wrestler's record vs. the opponent
             if record.opponentID > 0 and (force_update or not record.opponentID in w.matches_by_opponent):
                 w.matches_by_opponent[record.opponentID] = []
+                skip = 0
+                limit = 1000
                 while True:
                     matches, matchup = self.api.rikishi_matches(r.rikishiId, opponentId = record.opponentID, limit = limit, skip = skip)
                     for m in matches:
@@ -329,7 +383,7 @@ class SumoData:
     def _add_rikishi(self, rikishiId, shikonaEn, desc):
         # Create the SumoWrestler object
         # find the wrestler
-        rikishi = self.api.rikishi(rikishiId, measurements=True, ranks=True)
+        rikishi = self.api.rikishi(rikishiId, measurements=True, ranks=True, shikonas=True)
         if not rikishi:
             sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
             rikishi = Rikishi(id=rikishiId, shikonaEn=shikonaEn)
@@ -374,8 +428,18 @@ class SumoData:
         if not division in t.torikumi_by_division:
             t.torikumi_by_division[division] = {}
 
-        t.torikumi_by_day[day][division] = torikumi
-        t.torikumi_by_division[division][day] = torikumi
+        if torikumi:
+            t.torikumi_by_day[day][division] = torikumi.torikumi
+            t.torikumi_by_division[division][day] = torikumi.torikumi
+            for match in torikumi.torikumi:
+                if not match.eastId in self.rikishi:
+                    self._add_rikishi(match.eastId, match.eastShikona, f'E:{match.eastShikona}({match.eastId})')
+                if not match.westId in self.rikishi:
+                    self._add_rikishi(match.westId, match.westShikona, f'E:{match.westShikona}({match.westId})')
+        else:
+            t.torikumi_by_day[day][division] = []
+            t.torikumi_by_division[division][day] = []
+
         return
 
     def _set_match(self, m: BashoMatch):
