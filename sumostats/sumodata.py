@@ -23,12 +23,153 @@ class SumoWrestler():
     def id(self):
         return self.rikishi.id
 
-    def shikonaEn(self):
-        return self.rikishi.shikonaEn
+    def height(self):
+        return self.rikishi.height
+
+    def weight(self):
+        return self.rikishi.weight
+
+    def bmi(self):
+        return self.rikishi.bmi
+
+    def shikonaEn(self, bashoId: date = None):
+        if not bashoId:
+            return self.rikishi.shikonaEn
+
+        bashoShikona = self.rikishi.shikonaEn
+        for shikona in sorted(self.rikishi.shikonaHistory, key=lambda s: s.bashoId):
+            if shikona.bashoId < bashoId:
+                bashoShikona = shikona
+        return bashoShikona
+
+    def rank(self, bashoId: date = None):
+        if not bashoId:
+            return self.rikishi.currentRank
+
+        bashoRank = self.rikishi.currentRank
+        for rank in sorted(self.rikishi.rankHistory, key=lambda r: r.bashoId):
+            if rank.bashoId < bashoId:
+                bashoRank = rank
+        return bashoRank
 
     def get_rank_history(self) -> list[RikishiRank]:
-        return self.rikishi.rankHistory
-        return
+        return sorted(self.rikishi.rankHistory)
+
+class SumoMatchup():
+    def __init__(self, data, rikishi:SumoWrestler, opponent:SumoWrestler):
+        self.rikishi = rikishi
+        self.opponent = opponent
+        self.first_meeting = datetime.now().date()
+        self.last_meeting = date(1,1,1)
+
+        self._overall = RikishiMatchup()
+        self._by_division: dict[SumoDivision, RikishiMatchup] = {}
+        self._by_rank: dict[str, RikishiMatchup] = {}
+
+        if not opponent.id() in self.rikishi.matches_by_opponent:
+            return
+
+        matchlist = self.rikishi.matches_by_opponent[opponent.id()]
+
+        overall = self._overall
+        overall.total = len(matchlist)
+
+        # map each matchId string to a BashoMatch object and collect them into a list
+        # overall.matches = list(map(lambda m: data.matches.get(m), matchlist))
+        all_matches = list(map(lambda m: data.matches.get(m), matchlist))
+
+        for m in all_matches:
+            # keep track of first and last meeting dates (basho)
+            if m.bashoId < self.first_meeting:
+                self.first_meeting = m.bashoId
+            if m.bashoId > self.last_meeting:
+                self.last_meeting = m.bashoId
+
+            if not m.division in self._by_division:
+                self._by_division[m.division] = RikishiMatchup()
+            division = self._by_division[m.division]
+
+            rank = ''
+            if m.eastId == rikishi.rank:
+                rank = m.eastRank
+            else:
+                rank = m.westRank
+            if not rank in self._by_rank:
+                self._by_rank[rank] = RikishiMatchup()
+            byrank = self._by_rank[rank]
+
+            matchuplist = [overall, division, byrank]
+            for matchup in matchuplist:
+                # match totals and list by division and rank (of Rikishi)
+                matchup.total += 1
+                matchup.matches.append(m)
+
+            if m.winnerId == rikishi.id():
+                for matchup in matchuplist:
+                    matchup.rikishiWins += 1
+                    if not m.kimarite in matchup.kimariteWins:
+                        matchup.kimariteWins[m.kimarite] = 1
+                    else:
+                        matchup.kimariteWins[m.kimarite] += 1
+            else:
+                for matchup in matchuplist:
+                    matchup.opponentWins+= 1
+                    if not m.kimarite in matchup.kimariteLosses:
+                        matchup.kimariteLosses[m.kimarite] = 1
+                    else:
+                        matchup.kimariteLosses[m.kimarite] += 1
+
+    def total_matches(self):
+        return self._overall.total
+
+    def overall(self) -> RikishiMatchup:
+        return self._overall
+
+    def each_match(self):
+        for match in sorted(self._overall.matches, key=lambda m: m.bashoId, reverse=True):
+            yield match
+
+    def wins(self, no_fusensho=False):
+        wins = self._overall.rikishiWins
+        if no_fusensho:
+            if str(SumoResult.FUSEN) in self._overall.kimariteWins:
+                wins -= self._overall.kimariteWins[str(SumoResult.FUSEN)]
+        return wins
+
+    def fusensho(self):
+        if str(SumoResult.FUSEN) in self._overall.kimariteWins:
+            return self._overall.kimariteWins[str(SumoResult.FUSEN)]
+        return 0
+
+    def losses(self, no_fusenpai=False):
+        losses = self._overall.opponentWins
+        if no_fusenpai:
+            if str(SumoResult.FUSEN) in self._overall.kimariteLosses:
+                losses -= self._overall.kimariteLosses[str(SumoResult.FUSEN)]
+        return losses
+
+    def fusenpai(self):
+        if str(SumoResult.FUSEN) in self._overall.kimariteLosses:
+            return self._overall.kimariteLosses[str(SumoResult.FUSEN)]
+        return 0
+
+    def by_division(self, division:SumoDivision) -> RikishiMatchup:
+        if not division in self._by_division:
+            return RikishiMatchup()
+        return self._by_division[division]
+
+    def each_division(self):
+        for matchup in self._by_division.items():
+            yield matchup[0], matchup[1]
+
+    def by_rank(self, rank:str) -> RikishiMatchup:
+        if not rank in self._by_rank:
+            return RikishiMatchup()
+        return self._by_rank[rank]
+
+    def each_rank(self):
+        for matchup in self._by_rank.items():
+            yield matchup[0], matchup[1]
 
 class SumoBanzuke():
     def __init__(self, b:Banzuke):
@@ -81,33 +222,41 @@ class SumoTournament():
             return None
         return self.torikumi_by_day[day]
 
+    def get_bouts_in_division_on_day(self, division, day) -> list[BashoMatch]:
+        if not day in self.torikumi_by_day:
+            return None
+        if division not in self.torikumi_by_division:
+            return None
+        return self.torikumi_by_day[day][division]
+
     def get_upcoming_bouts(self, division) -> {int, list[BashoMatch]}:
         bouts = self.get_bouts_by_day_in_division(division)
         if not bouts:
-            return 0, None
+            return 0, []
         for day in sorted(bouts.keys()):
             matchlist = bouts[day]
             print(f'Day {day} bouts:{len(matchlist)}')
             if len(matchlist) > 0 and matchlist[0].upcoming():
                 return day, matchlist
-        return 0, None
+        return 0, []
 
-    def get_rikishi_record(self, rID: int) -> BanzukeRikishi:
+    def get_rikishi_record(self, rikishiId: int):
         """
-        Retrieve the 
+        Retrieve the record for a wrestler in this tournament
+        return BanzukiRikishi, SumoDivision
         """
-        if not rID in self.rikishi:
+        if not rikishiId in self.rikishi:
             return None, None
 
         # the rikishi fought in this tournament - look through the banzuke to
         # find their record
         for div in (SumoDivision):
             if div.value in self.banzuke:
-                r = self.banzuke[div.value].get_record(rID)
+                r = self.banzuke[div.value].get_record(rikishiId)
                 if r:
                     return r, div.value
 
-        sys.stderr.write(f'LookupError: did not find rID:{rID} in any division in {self.id()} (but they competed?)\n')
+        sys.stderr.write(f'LookupError: did not find rikishiId:{rikishiId} in any division in {self.id()} (but they competed?)\n')
         return None, None
 
 class SumoData:
@@ -151,38 +300,20 @@ class SumoData:
                 return self.rikishi[r]
         return None
 
-    def get_matchup_record(self, rikishi:int, opponent:int):
+    def get_matchup(self, rikishi:int, opponent:int):
         """
-        Create a RikishiMatchup object for all bouts between the specified rikishi and opponent
+        Create a SumoMatchup object for all bouts between the specified rikishi and opponent
         """
         if not rikishi in self.rikishi:
+            sys.stderr.write(f'Unknown rikishiId:{rikishi}\n')
+            return None
+        if not opponent in self.rikishi:
+            sys.stderr.write(f'Unknown opponentId:{opponent}\n')
             return None
 
-        opponentlist = self.rikishi[rikishi].matches_by_opponent
+        return SumoMatchup(self, self.rikishi[rikishi], self.rikishi[opponent])
 
-        matchlist = None
-        if opponent in opponentlist:
-            matchlist = opponentlist[opponent]
-        if not matchlist:
-            return None
-
-        matchup = RikishiMatchup()
-        matchup.total = len(matchlist)
-        matchup.matches = list(map(lambda m: self.matches.get(m), matchlist))
-        for m in matchup.matches:
-            if m.winnerId == rikishi:
-                matchup.rikishiWins += 1
-                if not m.kimarite in matchup.kimariteWins:
-                    matchup.kimariteWins[m.kimarite] = 0
-                matchup.kimariteWins[m.kimarite] += 1
-            else:
-                matchup.opponentWins += 1
-                if not m.kimarite in matchup.kimariteLosses:
-                    matchup.kimariteLosses[m.kimarite] = 0
-                matchup.kimariteLosses[m.kimarite] += 1
-        return matchup
-
-    def get_rikishi_basho_record(self, rikishiId, basho):
+    def get_rikishi_basho_record(self, rikishiId, bashoStr) -> {list[BanzukeRikishi], SumoDivision}:
         """
         Get the record of a rikishi in a specific basho.
         Returns a pair: list[BanzukeRikishi], SumoDivision
@@ -190,13 +321,13 @@ class SumoData:
         if not rikishiId in self.rikishi:
             return [], SumoDivision.Unknown
 
-        bashoDate = BashoDate(basho)
+        bashoDate = BashoDate(bashoStr)
         if not bashoDate in self.basho:
             return [], SumoDivision.Unknown
 
         return self.basho[bashoDate].get_rikishi_record(rikishiId)
 
-    def get_rikishi_basho_record_by_day(self, rikishiId, basho, day):
+    def get_rikishi_basho_record_by_day(self, rikishiId, bashoStr, day):
         return
 
     def load_data(path):
