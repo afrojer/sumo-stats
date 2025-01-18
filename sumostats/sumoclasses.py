@@ -182,6 +182,7 @@ class Rikishi:
     shusshin: str = ''
     height: float = 0.0
     weight: float = 0.0
+    bmi: float = 0.0
     debut: date = field(default='0001-01-01', metadata=dcjson_config(decoder=_decode_date))
     updatedAt: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
     createdAt: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
@@ -194,6 +195,8 @@ class Rikishi:
         # always make sure currentRankValue is set
         if self.currentRankValue < 0:
             self.currentRankValue = _RikishiRankValue[self.currentRank]
+        if self.bmi == 0.0 and self.height > 0.0:
+            self.bmi = self.weight / ((self.height/100.0) * (self.height/100.0))
         return
 
     def __str__(self):
