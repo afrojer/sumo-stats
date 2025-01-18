@@ -207,7 +207,7 @@ class SumoTournament():
     def id(self):
         return self.basho.id()
 
-    def get_banzuke(division: SumoDivision) -> SumoBanzuke:
+    def get_banzuke(self, division: SumoDivision) -> SumoBanzuke:
         if not division in self.banzuke:
             return None
         return self.banzuke[division]
@@ -240,7 +240,7 @@ class SumoTournament():
                 return day, matchlist
         return 0, []
 
-    def get_rikishi_record(self, rikishiId: int):
+    def get_rikishi_record(self, rikishiId: int) -> {BanzukeRikishi, SumoDivision}:
         """
         Retrieve the record for a wrestler in this tournament
         return BanzukiRikishi, SumoDivision
@@ -251,12 +251,13 @@ class SumoTournament():
         # the rikishi fought in this tournament - look through the banzuke to
         # find their record
         for div in (SumoDivision):
-            if div.value in self.banzuke:
-                r = self.banzuke[div.value].get_record(rikishiId)
+            d = SumoDivision(div.value)
+            if d in self.banzuke:
+                r = self.banzuke[d].get_record(rikishiId)
                 if r:
                     return r, div.value
 
-        sys.stderr.write(f'LookupError: did not find rikishiId:{rikishiId} in any division in {self.id()} (but they competed?)\n')
+        # sys.stderr.write(f'LookupError: did not find rikishiId:{rikishiId} in any division in {self.id()} (but they competed?)\n')
         return None, None
 
 class SumoData:
@@ -392,6 +393,24 @@ class SumoData:
             bashoDate = bashoDate + relativedelta(months=1)
             basho = self.api.basho(BashoIdStr(bashoDate))
         return
+
+    """
+    Iteration Methods
+
+    """
+    def total_rikishi(self):
+        return len(self.rikishi)
+
+    def each_rikishi(self):
+        for rikishi in self.rikishi.items():
+            yield rikishi[1]
+
+    def total_basho(self):
+        return len(self.basho)
+
+    def each_basho(self):
+        for basho in self.basho.items():
+            yield basho[1]
 
     """
     Private Methods
