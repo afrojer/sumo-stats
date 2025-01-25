@@ -109,7 +109,9 @@ class RikishiRank:
     rank: str = ''
 
     def RankValue(rankStr):
-        return _RikishiRankValue(rankStr)
+        if rankStr in _RikishiRankValue:
+            return _RikishiRankValue[rankStr]
+        return _RikishiRankValue['']
 
     def __post_init__(self):
         # Make sure this is always set
@@ -194,7 +196,8 @@ class Rikishi:
     def __post_init__(self):
         # always make sure currentRankValue is set
         if self.currentRankValue < 0:
-            self.currentRankValue = _RikishiRankValue[self.currentRank]
+            if self.currentRank in _RikishiRankValue:
+                self.currentRankValue = _RikishiRankValue[self.currentRank]
         if self.bmi == 0.0 and self.height > 0.0:
             self.bmi = self.weight / ((self.height/100.0) * (self.height/100.0))
         return

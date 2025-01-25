@@ -15,6 +15,7 @@ from sumostats.sumodata import *
 from sumostats.sumocalc import *
 
 from compare_physical import *
+from compare_record import *
 
 sumodata = None
 try:
@@ -26,7 +27,6 @@ except:
 # load the 2025-01 basho data and fetch the latest info from the server
 basho = sumodata.get_basho('202501', SumoDivision.Makuuchi, fetch=True)
 banzuke = basho.get_banzuke(SumoDivision.Makuuchi)
-print(banzuke)
 
 # save the data we just fetched
 sumodata.save_data('./sumo_data.pickle')
@@ -42,9 +42,13 @@ predictor = SumoBoutPredictor(sumodata)
 # When constructing each, you can give a weight to that comparison.
 #
 physical_comparison:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 1.0), \
-    CompareHeight(sumodata, 1.0), \
-    CompareWeight(sumodata, 1.0)
+    CompareBMI(sumodata, 0.3), \
+    CompareHeight(sumodata, 0.3), \
+    CompareWeight(sumodata, 0.3), \
+    CompareRank(sumodata, 2.0), \
+    CompareBashoRecord(sumodata, 1.5), \
+    CompareHeadToHead(sumodata, 1.7), \
+    CompareOverallRecord(sumodata, 1.2)
 ]
 predictor.add_comparisons(physical_comparison)
 
@@ -65,10 +69,10 @@ for bout in boutlist:
     sys.stdout.write(f'{"-"*78}\nMatch: {bout.matchNo}\n')
 
     east = sumodata.get_rikishi(bout.eastId)
-    eastRecord = banzuke.get_record(east.id())
+    eastRecord = banzuke.get_record_on_day(east.id(), day)
 
     west = sumodata.get_rikishi(bout.westId)
-    westRecord = banzuke.get_record(west.id())
+    westRecord = banzuke.get_record_on_day(west.id(), day)
 
     #
     # Generate the matchup record for these two, use the "east" side as the
@@ -77,7 +81,7 @@ for bout in boutlist:
     eastMatchup = sumodata.get_matchup(east.id(), west.id())
 
     # Run the prediction!
-    projectedWinner, confidence = predictor.predict(eastMatchup)
+    projectedWinner, confidence = predictor.predict(eastMatchup, basho, day)
 
     #
     # Print Stats

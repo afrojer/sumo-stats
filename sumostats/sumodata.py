@@ -42,18 +42,35 @@ class SumoWrestler():
                 bashoShikona = shikona
         return bashoShikona
 
-    def rank(self, bashoId: date = None):
+    def rank(self, bashoId = None):
         if not bashoId:
             return self.rikishi.currentRank
 
+        _bashoDate = BashoDate(bashoId)
         bashoRank = self.rikishi.currentRank
         for rank in sorted(self.rikishi.rankHistory, key=lambda r: r.bashoId):
-            if rank.bashoId < bashoId:
-                bashoRank = rank
+            if rank.bashoId < _bashoDate:
+                bashoRank = rank.rank
+        return bashoRank
+
+    def rankValue(self, bashoId = None):
+        if not bashoId:
+            return self.rikishi.currentRankValue
+
+        _bashoDate = BashoDate(bashoId)
+        bashoRank = self.rikishi.currentRankValue
+        for rank in sorted(self.rikishi.rankHistory, key=lambda r: r.bashoId):
+            if rank.bashoId < _bashoDate:
+                bashoRank = rank.rankValue
         return bashoRank
 
     def get_rank_history(self) -> list[RikishiRank]:
         return sorted(self.rikishi.rankHistory)
+
+    def each_match(self, data):
+        for mstr in self.all_matches:
+            yield data.get_match(mstr)
+
 
 class SumoMatchup():
     def __init__(self, data, rikishi:SumoWrestler, opponent:SumoWrestler):
@@ -171,25 +188,115 @@ class SumoMatchup():
         for matchup in self._by_rank.items():
             yield matchup[0], matchup[1]
 
+class SumoRecord():
+    def __init__(self, wins, losses, absences):
+        self.wins = wins
+        self.losses = losses
+        self.absences = absences
+
+class SumoBanzukeRikishi():
+    def __init__(self, record:BanzukeRikishi):
+        self.record_on_day: dict[int, SumoRecord] = {}
+        self.result_on_day: dict[int, SumoResult] = {}
+        self.opponent_on_day: dict[int, int] = {}
+
+        # TODO: de-dup the BashoTorikumi for lower memory usage when un-pickling?
+        self.match_on_day: dict[int, BashoMatch] = {}
+
+        self.rikishiId = record.rikishiId
+        self.rank = record.rank
+        self.rankValue = record.rankValue
+        self.side = record.side
+        self.wins = record.wins
+        self.losses = record.losses
+        self.absences = record.absences
+        # these are not guaranteed to be unordered, so unfortunately we can't infer any by-day stats
+        self.match_record:list[BanzukeMatchRecord] = record.record
+        return
+
+    def get_record_on_day(self, day:int) -> SumoRecord:
+        if day in self.record_on_day:
+            return self.record_on_day[day]
+        return None
+
+    def get_result_on_day(self, day:int) -> SumoResult:
+        if not day in self.result_on_day:
+            return SumoResult.UNKNOWN
+        return self.result_on_day[day]
+
+    def add_match(self, match:BashoMatch):
+        day = match.day
+        self.match_on_day[day] = match
+
+        opponent = match.eastId
+        if self.rikishiId == match.westId:
+            opponent = match.westId
+        self.opponent_on_day[day] = opponent
+
+        _result = SumoResult.UNKNOWN
+        _wins = 0
+        _losses = 0
+        _absences = 0
+        for d in range(1, day+1):
+            if d in self.match_on_day:
+                # found a record on this day
+                if self.match_on_day[d].winnerId == self.rikishiId:
+                    # we won!
+                    _wins += 1
+                    _result = SumoResult.WIN
+                    if self.match_on_day[d].kimarite == str(SumoResult.FUSEN):
+                        _result = SumoResult.FUSENSHO
+                else:
+                    # we didn't win: check if the loss was "fusen" to
+                    # accurately count absences vs. losses
+                    if self.match_on_day[d].kimarite == str(SumoResult.FUSEN):
+                        _absences += 1
+                        _result = SumoResult.FUSENPAI
+                    else:
+                        _losses += 1
+                        _result = SumoResult.LOSS
+            else:
+                # no record on this day yet? Count it as an absence
+                _absences += 1
+                _result = SumoResult.ABSENT
+        self.record_on_day[day] = SumoRecord(_wins, _losses, _absences)
+        self.result_on_day[day] = _result
+        return
+
 class SumoBanzuke():
     def __init__(self, b:Banzuke):
         self.bashoId = b.bashoId
         self.division = b.division
-        self.rikishi: dict[int, BanzukeRikishi] = {}
+        self.rikishi: dict[int, SumoBanzukeRikishi] = {}
 
         # re-index the Banzuki records into something more easily queried
         if b.east:
             for r in b.east:
-                self.rikishi[r.rikishiId] = r
+                self.rikishi[r.rikishiId] = SumoBanzukeRikishi(r)
         if b.west:
             for r in b.west:
-                self.rikishi[r.rikishiId] = r
+                self.rikishi[r.rikishiId] = SumoBanzukeRikishi(r)
         return
 
-    def get_record(self, rID):
+    def get_record(self, rID) -> SumoBanzukeRikishi:
         if not rID in self.rikishi:
             return None
         return self.rikishi[rID]
+
+    def get_record_on_day(self, rID, day) -> SumoRecord:
+        if not rID in self.rikishi:
+            return None
+        return self.rikishi[rID].get_record_on_day(day)
+
+    def add_torikumi(self, day:int, torikumi:list[BashoMatch]):
+        for match in torikumi:
+            rId = match.eastId
+            if rId in self.rikishi:
+                self.rikishi[rId].add_match(match)
+            rId = match.westId
+            if rId in self.rikishi:
+                self.rikishi[rId].add_match(match)
+        return
 
 class SumoTournament():
     def __init__(self, b:Basho):
@@ -206,6 +313,9 @@ class SumoTournament():
 
     def id(self):
         return self.basho.id()
+
+    def date(self):
+        return BashoDate(self.basho.id())
 
     def get_banzuke(self, division: SumoDivision) -> SumoBanzuke:
         if not division in self.banzuke:
@@ -240,10 +350,10 @@ class SumoTournament():
                 return day, matchlist
         return 0, []
 
-    def get_rikishi_record(self, rikishiId: int) -> {BanzukeRikishi, SumoDivision}:
+    def get_rikishi_record(self, rikishiId: int) -> {SumoBanzukeRikishi, SumoDivision}:
         """
         Retrieve the record for a wrestler in this tournament
-        return BanzukiRikishi, SumoDivision
+        return SumoBanzukiRikishi, SumoDivision
         """
         if not rikishiId in self.rikishi:
             return None, None
@@ -286,6 +396,11 @@ class SumoData:
             return None
         return self.basho[d]
 
+    def get_match(self, matchStr) -> BashoMatch:
+        if not matchStr in self.matches:
+            return None
+        return self.matches[matchStr]
+
     def get_rikishi(self, rikishiId) -> SumoWrestler:
         if not rikishiId in self.rikishi:
             return None
@@ -314,10 +429,10 @@ class SumoData:
 
         return SumoMatchup(self, self.rikishi[rikishi], self.rikishi[opponent])
 
-    def get_rikishi_basho_record(self, rikishiId, bashoStr) -> {list[BanzukeRikishi], SumoDivision}:
+    def get_rikishi_basho_record(self, rikishiId, bashoStr) -> {list[SumoBanzukeRikishi], SumoDivision}:
         """
         Get the record of a rikishi in a specific basho.
-        Returns a pair: list[BanzukeRikishi], SumoDivision
+        Returns a pair: list[SumoBanzukeRikishi], SumoDivision
         """
         if not rikishiId in self.rikishi:
             return [], SumoDivision.Unknown
@@ -585,7 +700,10 @@ class SumoData:
                 if not match.eastId in self.rikishi:
                     self._add_rikishi(match.eastId, match.eastShikona, f'E:{match.eastShikona}({match.eastId})')
                 if not match.westId in self.rikishi:
-                    self._add_rikishi(match.westId, match.westShikona, f'E:{match.westShikona}({match.westId})')
+                    self._add_rikishi(match.westId, match.westShikona, f'W:{match.westShikona}({match.westId})')
+            # Add the torikumi to the banzuke object
+            # (assume the banzuke object exists)
+            t.banzuke[division].add_torikumi(day, torikumi.torikumi)
         else:
             t.torikumi_by_day[day][division] = []
             t.torikumi_by_division[division][day] = []
