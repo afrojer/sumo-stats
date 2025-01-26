@@ -25,7 +25,9 @@ except:
     sumodata = SumoData()
 
 # load the 2025-01 basho data and fetch the latest info from the server
-basho = sumodata.get_basho('202501', SumoDivision.Makuuchi, fetch=True)
+basho = sumodata.get_basho('202501', SumoDivision.Makuuchi) #, fetch=True)
+if not basho:
+    basho = sumodata.get_basho('202501', SumoDivision.Makuuchi, fetch=True)
 banzuke = basho.get_banzuke(SumoDivision.Makuuchi)
 
 # save the data we just fetched
@@ -56,11 +58,13 @@ predictor.add_comparisons(physical_comparison)
 
 # get a list of upcoming bouts (the first day where no bout has a listed winner)
 # boutlist is a list of BashoMatch objects
-day, boutlist = basho.get_upcoming_bouts(SumoDivision.Makuuchi)
+day = 0
+boutlist = []
+# day, boutlist = basho.get_upcoming_bouts(SumoDivision.Makuuchi)
 
 # If there wasn't a list of upcoming bouts, then grab a random day and print it out
 if len(boutlist) == 0:
-    day = 3
+    day = 9
     boutlist = basho.get_bouts_in_division_on_day(SumoDivision.Makuuchi, day)
 
 print(f'\nBasho {basho.id()}, Day {day}')
@@ -138,6 +142,10 @@ for bout in boutlist:
             sys.stdout.write(f'\n    {div:10}: {matchup.rikishiWins}-{matchup.opponentWins}')
 
     # Finall the good stuff: print the prediced winner!
-    sys.stdout.write(f'\nProjected Winner: {projectedWinner}, Confidence:{confidence:.2%}')
+    sys.stdout.write(f'\nProjected Winner: {projectedWinner}, Confidence:{abs(confidence):.2%}')
+
+    if bout.winnerId > 0:
+        actualWinner = sumodata.get_rikishi(bout.winnerId)
+        sys.stdout.write(f'\nActual Winner: {actualWinner}')
 
     sys.stdout.write('\n\n')

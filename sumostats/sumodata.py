@@ -189,7 +189,7 @@ class SumoMatchup():
             yield matchup[0], matchup[1]
 
 class SumoRecord():
-    def __init__(self, wins, losses, absences):
+    def __init__(self, wins = 0, losses = 0, absences = 0):
         self.wins = wins
         self.losses = losses
         self.absences = absences
@@ -212,6 +212,8 @@ class SumoBanzukeRikishi():
         self.absences = record.absences
         # these are not guaranteed to be unordered, so unfortunately we can't infer any by-day stats
         self.match_record:list[BanzukeMatchRecord] = record.record
+        # we will order them as individual matches are set
+        self.match_record_by_day:dict[int, BanzukeMatchRecord] = {}
         return
 
     def get_record_on_day(self, day:int) -> SumoRecord:
@@ -229,15 +231,25 @@ class SumoBanzukeRikishi():
         self.match_on_day[day] = match
 
         opponent = match.eastId
-        if self.rikishiId == match.westId:
+        if self.rikishiId == match.eastId:
             opponent = match.westId
         self.opponent_on_day[day] = opponent
+
+        # Find the BanzukeMatchRecord for this day (based on opponent)
+        # this isn't perfect, but iterating through the list from start
+        # to finish should get us close enough b/c facing the same rikishi
+        # more than once in a tournament should be rare
+        for r in self.match_record:
+            if r.opponentID == opponent:
+                self.match_record_by_day[day] = r
+                break
 
         _result = SumoResult.UNKNOWN
         _wins = 0
         _losses = 0
         _absences = 0
-        for d in range(1, day+1):
+        # Run through each day and re-calculate the record on that day
+        for d in range(1, len(self.match_record) + 1):
             if d in self.match_on_day:
                 # found a record on this day
                 if self.match_on_day[d].winnerId == self.rikishiId:
@@ -259,8 +271,19 @@ class SumoBanzukeRikishi():
                 # no record on this day yet? Count it as an absence
                 _absences += 1
                 _result = SumoResult.ABSENT
-        self.record_on_day[day] = SumoRecord(_wins, _losses, _absences)
-        self.result_on_day[day] = _result
+            self.record_on_day[d] = SumoRecord(_wins, _losses, _absences)
+            self.result_on_day[d] = _result
+        return
+
+    def each_match(self, until:int = 0):
+        for day in range(1, len(self.match_record) + 1):
+            if until > 0 and day > until:
+                return
+            if not day in self.match_record_by_day:
+                # yield an empty record if we don't know about this day (yet)
+                yield day, BanzukeMatchRecord()
+            else:
+                yield day, self.match_record_by_day[day]
         return
 
 class SumoBanzuke():
@@ -678,7 +701,7 @@ class SumoData:
             skip += limit
 
         self.rikishi[rikishiId] = SumoWrestler(rikishi, stats)
-        self.rikishi[rikishiId].matches = all_matches
+        self.rikishi[rikishiId].all_matches = all_matches
 
         return True
 

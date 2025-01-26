@@ -312,7 +312,7 @@ class BashoTorikumi(Basho):
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class BanzukeMatchRecord:
-    opponentID: int
+    opponentID: int = -1
     result: SumoResult = SumoResult.UNKNOWN
     kimarite: str = ''
     opponentShikonaEn: str = ''

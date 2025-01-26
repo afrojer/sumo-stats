@@ -19,6 +19,7 @@ class SumoBoutCompare():
     def __init__(self, data:SumoData, weight:float = 1.0):
         self._data = data
         self._weight = weight
+        self._DEBUG = False
         if not self._data:
             raise Exception('data cannot be empty/None')
 
@@ -36,7 +37,15 @@ class SumoBoutCompare():
     def weight(self):
         return self._weight
 
-    def __call__(self, matchup:SumoMatchup, basho:SumoTournament, day:int):
+    def debug(self, fmtStr, **kwargs):
+        if not self._DEBUG:
+            return
+        for key, value in kwargs.items():
+            fmtStr = fmtStr.replace(f'@{key}', repr(value))
+        sys.stdout.write(f'  {type(self).__name__}: {fmtStr}\n')
+
+    def __call__(self, matchup:SumoMatchup, basho:SumoTournament, day:int, DEBUG=False):
+        self._DEBUG = DEBUG
         return self.compare(matchup, basho, day) * self._weight
 
 
@@ -67,7 +76,7 @@ class SumoBoutPredictor():
         self._comparison.extend(compare)
         return
 
-    def predict(self, matchup:SumoMatchup, basho:SumoTournament, day:int) -> {SumoWrestler, float}:
+    def predict(self, matchup:SumoMatchup, basho:SumoTournament, day:int, DEBUG=False) -> {SumoWrestler, float}:
         """
         Use all previously added bout comparison objects to predict the outcome
         of the specified matchup.
@@ -84,7 +93,7 @@ class SumoBoutPredictor():
         else:
             weight = 0.0
             for c in self._comparison:
-                probability += c(matchup, basho, day)
+                probability += c(matchup, basho, day, DEBUG)
                 weight += c.weight()
             probability = probability / weight
 
