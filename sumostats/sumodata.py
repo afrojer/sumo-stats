@@ -426,6 +426,9 @@ class SumoTournament():
     def date(self):
         return BashoDate(self.basho.id_str())
 
+    def num_days(self):
+        return len(self.torikumi_by_day.keys())
+
     def get_banzuke(self, division: SumoDivision) -> SumoBanzuke:
         if not division in self.banzuke:
             return None
