@@ -85,7 +85,7 @@ for bout in boutlist:
     eastMatchup = sumodata.get_matchup(east.id(), west.id())
 
     # Run the prediction!
-    projectedWinner, confidence = predictor.predict(eastMatchup, basho, day, DEBUG=True)
+    projectedWinner, confidence = predictor.predict(eastMatchup, basho, day, DEBUG=False)
 
     #
     # Print Stats
