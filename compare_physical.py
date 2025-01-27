@@ -42,7 +42,7 @@ class CompareBMI(SumoBoutCompare):
     normalize the BMI value between 0 and 1
 
     """
-    def compare(self, matchup, basho, day):
+    def compare(self, matchup, basho, division, day):
         _minBMI = 18.5
         _maxBMI = 85
         _bmiRange = _maxBMI - _minBMI
@@ -64,7 +64,7 @@ class CompareHeight(SumoBoutCompare):
     The shortest recorded Sumo wrestler is 1.58m (Tamatsubaki Kentarō)
 
     """
-    def compare(self, matchup, basho, day):
+    def compare(self, matchup, basho, division, day):
         _maxHeight = 227.0 # cm
         _minHeight = 158.0 # cm
         _heightDiffRange = _maxHeight - _minHeight
@@ -86,7 +86,7 @@ class CompareWeight(SumoBoutCompare):
     The lightest recorded Sumo wrestler is 73kg (Tamatsubaki Kentarō)
 
     """
-    def compare(self, matchup, basho, day):
+    def compare(self, matchup, basho, division, day):
         _maxWeight = 292.6 # kg
         _minWeight = 73.0 # kg
         _weightDiffRange = _maxWeight - _minWeight

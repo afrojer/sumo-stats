@@ -49,7 +49,8 @@ physical_comparison:list[SumoBoutCompare] = [ \
     CompareWeight(sumodata, 0.2), \
     CompareRank(sumodata, 1.5), \
     CompareBashoRecord(sumodata, 1.8), \
-    CompareHeadToHead(sumodata, 1.7), \
+    CompareHeadToHeadFull(sumodata, 0.8), \
+    CompareHeadToHeadCurrentDivision(sumodata, 1.7), \
     CompareOverallRecord(sumodata, 1.2)
 ]
 predictor.add_comparisons(physical_comparison)
@@ -67,7 +68,7 @@ if len(boutlist) == 0:
     day = 9
     boutlist = basho.get_bouts_in_division_on_day(SumoDivision.Makuuchi, day)
 
-print(f'\nBasho {basho.id()}, Day {day}')
+print(f'\nBasho {basho.id_str()}, Day {day}')
 
 for bout in boutlist:
     sys.stdout.write(f'{"-"*78}\nMatch: {bout.matchNo}\n')
@@ -85,7 +86,7 @@ for bout in boutlist:
     eastMatchup = sumodata.get_matchup(east.id(), west.id())
 
     # Run the prediction!
-    projectedWinner, confidence = predictor.predict(eastMatchup, basho, day, DEBUG=False)
+    projectedWinner, confidence = predictor.predict(eastMatchup, basho, SumoDivision.Makuuchi, day, DEBUG=False)
 
     #
     # Print Stats

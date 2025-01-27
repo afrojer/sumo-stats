@@ -32,13 +32,13 @@ class SumoWrestler():
     def bmi(self):
         return self.rikishi.bmi
 
-    def shikonaEn(self, bashoId: date = None):
-        if not bashoId:
+    def shikonaEn(self, bashoDate:date = None):
+        if not bashoDate:
             return self.rikishi.shikonaEn
 
         bashoShikona = self.rikishi.shikonaEn
         for shikona in sorted(self.rikishi.shikonaHistory, key=lambda s: s.bashoId):
-            if shikona.bashoId < bashoId:
+            if shikona.bashoId < bashoDate:
                 bashoShikona = shikona
         return bashoShikona
 
@@ -89,10 +89,8 @@ class SumoMatchup():
         matchlist = self.rikishi.matches_by_opponent[opponent.id()]
 
         overall = self._overall
-        # overall.total = len(matchlist)
 
         # map each matchId string to a BashoMatch object and collect them into a list
-        # overall.matches = list(map(lambda m: data.matches.get(m), matchlist))
         all_matches = list(map(lambda m: data.matches.get(m), matchlist))
 
         for m in all_matches:
@@ -107,7 +105,7 @@ class SumoMatchup():
             division = self._by_division[m.division]
 
             rank = ''
-            if m.eastId == rikishi.rank:
+            if m.eastId == rikishi.id():
                 rank = m.eastRank
             else:
                 rank = m.westRank
@@ -136,43 +134,15 @@ class SumoMatchup():
                     else:
                         matchup.kimariteLosses[m.kimarite] += 1
 
-    def total_matches(self, no_fusen=False):
-        if no_fusen and str(SumoResult.FUSEN) in self._overall.kimariteWins:
-            return self._overall.total - self._overall.kimariteWins[str(SumoResult.FUSEN)]
-        return self._overall.total
+    #
+    # Get matchup (stats) objects
+    # Iterate over matchup objects by divisions and ranks
+    # 
 
-    def overall(self) -> RikishiMatchup:
+    def matchup_overall(self) -> RikishiMatchup:
         return self._overall
 
-    def each_match(self):
-        for match in sorted(self._overall.matches, key=lambda m: m.bashoId, reverse=True):
-            yield match
-
-    def wins(self, no_fusensho=False):
-        wins = self._overall.rikishiWins
-        if no_fusensho:
-            if str(SumoResult.FUSEN) in self._overall.kimariteWins:
-                wins -= self._overall.kimariteWins[str(SumoResult.FUSEN)]
-        return wins
-
-    def fusensho(self):
-        if str(SumoResult.FUSEN) in self._overall.kimariteWins:
-            return self._overall.kimariteWins[str(SumoResult.FUSEN)]
-        return 0
-
-    def losses(self, no_fusenpai=False):
-        losses = self._overall.opponentWins
-        if no_fusenpai:
-            if str(SumoResult.FUSEN) in self._overall.kimariteLosses:
-                losses -= self._overall.kimariteLosses[str(SumoResult.FUSEN)]
-        return losses
-
-    def fusenpai(self):
-        if str(SumoResult.FUSEN) in self._overall.kimariteLosses:
-            return self._overall.kimariteLosses[str(SumoResult.FUSEN)]
-        return 0
-
-    def by_division(self, division:SumoDivision) -> RikishiMatchup:
+    def matchup_by_division(self, division:SumoDivision) -> RikishiMatchup:
         if not division in self._by_division:
             return RikishiMatchup()
         return self._by_division[division]
@@ -181,7 +151,7 @@ class SumoMatchup():
         for matchup in self._by_division.items():
             yield matchup[0], matchup[1]
 
-    def by_rank(self, rank:str) -> RikishiMatchup:
+    def matchup_by_rank(self, rank:str) -> RikishiMatchup:
         if not rank in self._by_rank:
             return RikishiMatchup()
         return self._by_rank[rank]
@@ -189,6 +159,120 @@ class SumoMatchup():
     def each_rank(self):
         for matchup in self._by_rank.items():
             yield matchup[0], matchup[1]
+
+    def each_match(self, beforeBasho:date = None, in_division:SumoDivision = None, at_rank = None):
+        """
+        Generator to iterate over each match the rikishi and opponent have fought.
+        You can filter the matches to iterate over using the
+        'beforeBasho', 'in_division', and 'at_rank' parameters
+        """
+        # Allow ranks to be passed as strings or ints
+        rankVal = -1
+        if at_rank and is_instance(at_rank, str):
+            rankVal = RikishiRank.RankValue(at_rank)
+        elif at_rank:
+            rankVal = int(at_rank)
+
+        # run through all matches, and filter/yield based on the input
+        for match in sorted(self._overall.matches, key=lambda m: m.bashoId, reverse=True):
+            # set this to false if a one of the inputs would 
+            # filter out the current match
+            should_yield = True
+
+            if beforeBasho and match.bashoId >= beforeBasho:
+                should_yield = False
+            elif in_division and not match.division == in_division:
+                should_yield = False
+            elif rankVal > 0:
+                if (match.eastId == self.rikishi.id()) and (rankVal != RikishiRank.RankValue(match.eastRank)):
+                    should_yield = False
+                if (match.westId == self.rikishi.id()) and (rankVal != RikishiRank.RankValue(match.westRank)):
+                    should_yield = False
+            if should_yield:
+                yield match
+
+    #
+    # Get single values (with filters)
+    #
+
+    def total_matches(self, no_fusen=False, beforeBasho:date = None, in_division:SumoDivision = None, at_rank = None):
+        if not beforeBasho and not in_division and not at_rank:
+            # this is the simple case where we can just grab a number
+            if no_fusen and str(SumoResult.FUSEN) in self._overall.kimariteWins:
+                return self._overall.total - self._overall.kimariteWins[str(SumoResult.FUSEN)]
+            return self._overall.total
+
+        # We have to do some filtering, so run through every match
+        # fortunately, this generator does most of the filtering!
+        _total = 0
+        for match in self.each_match(beforeBasho=beforeBasho, in_division=in_division, at_rank=at_rank):
+            if no_fusen and match.kimarite == str(SumoResult.FUSEN):
+                pass
+            else:
+                _total += 1
+        return _total
+
+    def wins(self, no_fusensho=False, beforeBasho:date = None, in_division:SumoDivision = None, at_rank = None):
+        wins = self._overall.rikishiWins
+        if no_fusensho:
+            if str(SumoResult.FUSEN) in self._overall.kimariteWins:
+                wins -= self._overall.kimariteWins[str(SumoResult.FUSEN)]
+        # easy case: no filtering
+        if not beforeBasho and not in_division and not at_rank:
+            return wins
+
+        # use the each_match generator to filter for us
+        wins = 0
+        for match in self.each_match(beforeBasho=beforeBasho, in_division=in_division, at_rank=at_rank):
+            if match.winnerId == self.rikishi.id():
+                if no_fusensho and match.kimarite == str(SumoResult.FUSEN):
+                    pass
+                else:
+                    wins += 1
+        return wins
+
+    def fusensho(self, beforeBasho:date = None, in_division:SumoDivision = None, at_rank = None):
+        if not beforeBasho and not in_division and not at_rank:
+            if str(SumoResult.FUSEN) in self._overall.kimariteWins:
+                return self._overall.kimariteWins[str(SumoResult.FUSEN)]
+            return 0
+        else:
+            fusen = 0
+            for match in self.each_match(beforeBasho=beforeBasho, in_division=in_division, at_rank=at_rank):
+                if match.kimarite == str(SumoResult.FUSEN) and match.winnerId == self.rikishi.id():
+                    fusen += 1
+            return fusen
+
+    def losses(self, no_fusenpai=False, beforeBasho:date = None, in_division:SumoDivision = None, at_rank = None):
+        losses = self._overall.opponentWins
+        if no_fusenpai:
+            if str(SumoResult.FUSEN) in self._overall.kimariteLosses:
+                losses -= self._overall.kimariteLosses[str(SumoResult.FUSEN)]
+        # easy case: no filtering
+        if not beforeBasho and not in_division and not at_rank:
+            return losses
+
+        # use the each_match generator to filter for us
+        losses = 0
+        for match in self.each_match(beforeBasho=beforeBasho, in_division=in_division, at_rank=at_rank):
+            if not (match.winnerId == self.rikishi.id()):
+                if no_fusenpai and match.kimarite == str(SumoResult.FUSEN):
+                    pass
+                else:
+                    losses += 1
+        return losses
+
+    def fusenpai(self, beforeBasho:date = None, in_division:SumoDivision = None, at_rank = None):
+        if not beforeBasho and not in_division and not at_rank:
+            if str(SumoResult.FUSEN) in self._overall.kimariteLosses:
+                return self._overall.kimariteLosses[str(SumoResult.FUSEN)]
+            return 0
+        else:
+            fusen = 0
+            for match in self.each_match(beforeBasho=beforeBasho, in_division=in_division, at_rank=at_rank):
+                if match.kimarite == str(SumoResult.FUSEN) and not (match.winnerId == self.rikishi.id()):
+                    fusen += 1
+            return fusen
 
 class SumoRecord():
     def __init__(self, wins = 0, losses = 0, absences = 0):
@@ -336,11 +420,11 @@ class SumoTournament():
         self.torikumi_by_day: dict[int, dict[SumoDivision, list[BashoMatch]]] = {}
         return
 
-    def id(self):
-        return self.basho.id()
+    def id_str(self):
+        return self.basho.id_str()
 
     def date(self):
-        return BashoDate(self.basho.id())
+        return BashoDate(self.basho.id_str())
 
     def get_banzuke(self, division: SumoDivision) -> SumoBanzuke:
         if not division in self.banzuke:
@@ -392,7 +476,7 @@ class SumoTournament():
                 if r:
                     return r, div.value
 
-        # sys.stderr.write(f'LookupError: did not find rikishiId:{rikishiId} in any division in {self.id()} (but they competed?)\n')
+        # sys.stderr.write(f'LookupError: did not find rikishiId:{rikishiId} in any division in {self.id_str()} (but they competed?)\n')
         return None, None
 
 class SumoData:
@@ -497,7 +581,7 @@ class SumoData:
         """
         basho = self.api.basho(BashoIdStr(bashoDate))
         if not basho or not basho.isValid():
-            sys.stderr.write(f'Could not query basho:{bashoId}\n')
+            sys.stderr.write(f'Could not query basho:{bashoDate}\n')
             return
         self._add_basho(basho, division, forceUpdate=True)
         return
@@ -565,13 +649,13 @@ class SumoData:
         if b.bashoDate in self.basho:
             # Assume we already know about this one
             if not forceUpdate:
-                sys.stderr.write(f'Skipping tournament: {b.id()} (already in table)\n')
+                sys.stderr.write(f'Skipping tournament: {b.id_str()} (already in table)\n')
                 return
-            sys.stderr.write(f'Updating tournament: {b.id()} (from API source)\n')
+            sys.stderr.write(f'Updating tournament: {b.id_str()} (from API source)\n')
             tournament = self.basho[b.bashoDate]
             tournament.basho = b
         else:
-            sys.stdout.write(f'Add New SumoTournament: {b.id()}\n')
+            sys.stdout.write(f'Add New SumoTournament: {b.id_str()}\n')
             # Add this basho to our table as a set of Tournament objects
             tournament = SumoTournament(b)
 
@@ -588,11 +672,11 @@ class SumoData:
         return
 
     def _add_banzuke(self, tournament: SumoTournament, division: SumoDivision, forceUpdate = False):
-        sys.stdout.write(f'Query Banzuke for {division} (in {tournament.id()})\n')
+        sys.stdout.write(f'Query Banzuke for {division} (in {tournament.id_str()})\n')
         # Use the API to grab banzuke info
-        banzuke = self.api.basho_banzuke(tournament.id(), division)
+        banzuke = self.api.basho_banzuke(tournament.id_str(), division)
         if not banzuke:
-            sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id()}')
+            sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id_str()}')
             return
 
         # Updates will just replace the banzuke
@@ -711,7 +795,7 @@ class SumoData:
         sys.stdout.write(f'    Add Day {day} Torikumi for {division}{" "*50}\n')
 
         # grab the day's torikumi in the givin division
-        torikumi = self.api.basho_torikumi(t.id(), division, day)
+        torikumi = self.api.basho_torikumi(t.id_str(), division, day)
 
         if not day in t.torikumi_by_day:
             t.torikumi_by_day[day] = {}

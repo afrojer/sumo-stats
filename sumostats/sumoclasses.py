@@ -55,6 +55,102 @@ class SumoDivision(Enum):
             return False
         return True
 
+    def __hash__(self):
+        return hash(str(self.value))
+
+    # compare divisions
+    def __eq__(self, other):
+        try:
+            return self.value == other.value
+        except:
+            pass
+        return NotImplemented
+    def __ne__(self, other):
+        try:
+            return self.value != other.value
+        except:
+            pass
+        return NotImplemented
+    def __lt__(self, other):
+        try:
+            o = SumoDivision(str(other.value))
+            if o == SumoDivision.Makuuchi:
+                if self.value == SumoDivision.Makuuchi:
+                    return False
+                else:
+                    return True
+            elif o == SumoDivision.Juryo:
+                if self.value == SumoDivision.Makuuchi or \
+                        self.value == SumoDivision.Juryo:
+                    return False
+                elif self.value == SumoDivision.Makushita or \
+                     self.value == SumoDivision.Sandanme or \
+                     self.value == SumoDivision.Jonidan or \
+                     self.value == SumoDivision.Jonokuchi or \
+                     self.value == SumoDivision.MaeZumo:
+                    return True
+                else:
+                    return True
+            elif o == SumoDivision.Makushita:
+                if self.value == SumoDivision.Makuuchi or \
+                        self.value == SumoDivision.Juryo or \
+                        self.value == SumoDivision.Makushita:
+                    return False
+                elif self.value == SumoDivision.Sandanme or \
+                     self.value == SumoDivision.Jonidan or \
+                     self.value == SumoDivision.Jonokuchi or \
+                     self.value == SumoDivision.MaeZumo:
+                    return True
+                else:
+                    return True
+            elif o == SumoDivision.Sandanme:
+                if self.value == SumoDivision.Makuuchi or \
+                        self.value == SumoDivision.Juryo or \
+                        self.value == SumoDivision.Makushita or \
+                        self.value == SumoDivision.Sandanme:
+                    return False
+                elif self.value == SumoDivision.Jonidan or \
+                     self.value == SumoDivision.Jonokuchi or \
+                     self.value == SumoDivision.MaeZumo:
+                    return True
+                else:
+                    return True
+            elif o == SumoDivision.Jonidan:
+                if self.value == SumoDivision.Makuuchi or \
+                        self.value == SumoDivision.Juryo or \
+                        self.value == SumoDivision.Makushita or \
+                        self.value == SumoDivision.Sandanme or \
+                        self.value == SumoDivision.Jonidan:
+                    return False
+                elif self.value == SumoDivision.Jonokuchi or \
+                     self.value == SumoDivision.MaeZumo:
+                    return True
+                else:
+                    return True
+            elif o == SumoDivision.Jonokuchi:
+                if self.value == SumoDivision.Makuuchi or \
+                        self.value == SumoDivision.Juryo or \
+                        self.value == SumoDivision.Makushita or \
+                        self.value == SumoDivision.Sandanme or \
+                        self.value == SumoDivision.Jonidan or \
+                        self.value == SumoDivision.Jonokuchi:
+                    return False
+                elif self.value == SumoDivision.MaeZumo:
+                    return True
+                else:
+                    return True
+            else:
+                return False
+        except:
+            pass
+        return NotImplemented
+    def __le__(self, other):
+        return self.__lt__(other) or self.__eq__(other)
+    def __gt__(self, other):
+        return not self.__lt(other)
+    def __ge__(self, other):
+        return self.__gt__(other) or self.__eq__(other)
+
 class SumoResult(Enum):
     WIN = 'win'
     LOSS = 'loss'
@@ -82,6 +178,7 @@ class SumoResult(Enum):
 @dataclass()
 class RikishiMeasurement:
     id: str = ''
+    # TODO: this should be a date object I think
     bashoId: int = -1
     rikishiId: int = -1
     height: float = 0.0
@@ -296,8 +393,11 @@ class Basho:
     specialPrizes: list[SpecialPrize] = field(default_factory=list)
     location: str = ''
 
-    def id(self):
+    def id_str(self):
         return BashoIdStr(self.bashoDate)
+
+    def date(self):
+        return self.bashoDate
 
     def isValid(self):
         return self.bashoDate.year > 1000

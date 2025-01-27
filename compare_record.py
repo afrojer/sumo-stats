@@ -20,10 +20,10 @@ from sumostats.sumodata import *
 from sumostats.sumocalc import *
 
 class CompareRank(SumoBoutCompare):
-    def compare(self, matchup, basho, day):
-        rRank = matchup.rikishi.rank(basho.id())
+    def compare(self, matchup, basho, division, day):
+        rRank = matchup.rikishi.rank(basho.id_str())
         rVal = RikishiRank.RankValue(rRank)
-        oRank = matchup.opponent.rank(basho.id())
+        oRank = matchup.opponent.rank(basho.id_str())
         oVal = RikishiRank.RankValue(oRank)
 
         # lower rank values are better rikishi
@@ -43,7 +43,7 @@ class CompareBashoRecord(SumoBoutCompare):
     """
     Compare rikishi based on their current record in the basho.
     """
-    def compare(self, matchup, basho, day):
+    def compare(self, matchup, basho, division, day):
         _rikishiRecord, r_div = basho.get_rikishi_record(matchup.rikishi.id())
         _opponentRecord, o_div = basho.get_rikishi_record(matchup.opponent.id())
         if not _rikishiRecord or not _opponentRecord:
@@ -103,16 +103,16 @@ class CompareBashoRecord(SumoBoutCompare):
                    pct=_pct)
         return _pct
 
-class CompareHeadToHead(SumoBoutCompare):
+class CompareHeadToHeadFull(SumoBoutCompare):
     """
-    Compare rikishi based on their head-to-head record
+    Compare rikishi based on their entire head-to-head record
     """
-    def compare(self, matchup, basho, day):
-        # matchup.first_meeting
-        # matchup.last_meeting
+    def compare(self, matchup, basho, division, day):
+        # TODO: use matchup.first_meeting?
+        # TODO: use matchup.last_meeting?
 
-        _rWins = matchup.wins(no_fusensho=True)
-        _total = matchup.total_matches(no_fusen=True)
+        _rWins = matchup.wins(no_fusensho=True, beforeBasho=basho.date())
+        _total = matchup.total_matches(no_fusen=True, beforeBasho=basho.date())
 
         if _total == 0:
             self.debug('No non-fusen head-to-head matches fought')
@@ -127,11 +127,35 @@ class CompareHeadToHead(SumoBoutCompare):
                    wpct=_winPct, rWins=_rWins, total=_total, pct=_pct)
         return _pct
 
+class CompareHeadToHeadCurrentDivision(SumoBoutCompare):
+    """
+    Compare rikishi based on their head-to-head record in the current division
+    """
+    def compare(self, matchup, basho, division, day):
+
+        # if matchup.rikishi and matchup.opponent are in different divisions
+        # then we need to pick one. Let's 
+        _rWins = matchup.wins(no_fusensho=True, beforeBasho=basho.date(), in_division=division)
+        _total = matchup.total_matches(no_fusen=True, beforeBasho=basho.date(), in_division=division)
+
+        if _total == 0:
+            self.debug('No non-fusen head-to-head matches in {division} fought')
+            return 0.0
+
+        _winPct = float(_rWins) / float(_total)
+
+        # stretch the win percentage across a [-1, 1] range
+        _pct = ((2.0 * _winPct) - 1.0)
+
+        self.debug('In:@div, WinPct:@wpct [@rWins/@total], PCT:@pct', \
+                   div=division, wpct=_winPct, rWins=_rWins, total=_total, pct=_pct)
+        return _pct
+
 class CompareOverallRecord(SumoBoutCompare):
     """
     Compare rikishi based on their overall win/loss records
     """
-    def compare(self, matchup, basho, day):
+    def compare(self, matchup, basho, division, day):
         # TODO: we should probably pre-calculate this...
         _wins = 0
         _total = 0
