@@ -68,36 +68,35 @@ class CompareBashoRecord(SumoBoutCompare):
         # (they should fight harder)
         if rRecord.wins == 7 or rRecord.losses == 7:
             _boost += 0.2
-            self.debug('Rikishi win/loss boost!')
+            self.debug('Rikishi win/loss boost! (boost=@boost)', boost=_boost)
         if oRecord.wins == 7 or oRecord.losses == 7:
             _boost -= 0.2
-            self.debug('Opponent win/loss boost!')
+            self.debug('Opponent win/loss boost! (boost=@boost)', boost=_boost)
 
         # Look at the rikishi to see if he's on a win-streak
         _rstreak = 0
-        _rboost = 0.0
         for _, br in _rikishiRecord.each_match(until=day):
             if br.result == SumoResult.WIN:
                 _rstreak += 1
             else:
                 _rstreak = 0
         # add a boost if the rikishi is on a streak
-        # NOTE: this value is not very scientific... it's more of a guess
-        _rboost += 0.5 * (float(_rstreak) / float(day))
+        # TODO: NOTE: this value is not very scientific... it's more of a guess
+        _rboost = 0.5 * (float(_rstreak) / float(day))
 
         # Look at the opponent to see if he's on a win-streak
         _ostreak = 0
-        _oboost = 0.0
         for _, br in _opponentRecord.each_match(until=day):
             if br.result == SumoResult.WIN:
                 _ostreak += 1
             else:
                 _ostreak = 0
-        _oboost -= 0.5 * (float(_ostreak) / float(day))
+        # add a boost if the opponent is on a streak
+        # TODO: NOTE: this value is not very scientific... it's more of a guess
+        _oboost = 0.5 * (float(_ostreak) / float(day))
 
-        _boost = _boost + _rboost + _oboost
-        _winDiff * (1.0 + _boost)
-        _pct = max(min(-1.0, _winDiff), 1.0)
+        _boost = _boost + _rboost - _oboost
+        _pct = min(max(-1.0, _winDiff + _boost), 1.0)
 
         self.debug('RikishiBoost:@rboost (streak=@rstreak), OppBoost:@oboost (streak:@ostreak) PCT:@pct', \
                    rboost=_rboost, rstreak=_rstreak, oboost=_oboost, ostreak=_ostreak, \
@@ -112,15 +111,20 @@ class CompareHeadToHead(SumoBoutCompare):
         # matchup.first_meeting
         # matchup.last_meeting
 
-        if matchup.total_matches() == 0:
-            self.debug('No head-to-head matches fought')
+        _rWins = matchup.wins(no_fusensho=True)
+        _total = matchup.total_matches(no_fusen=True)
+
+        if _total == 0:
+            self.debug('No non-fusen head-to-head matches fought')
             return 0.0
 
-        _winPct = float(matchup.wins(no_fusensho=True)) / float(matchup.total_matches())
+        _winPct = float(_rWins) / float(_total)
+
         # stretch the win percentage across a [-1, 1] range
         _pct = ((2.0 * _winPct) - 1.0)
 
-        self.debug('WinPct:@wpct, PCT:@pct', wpct=_winPct, pct=_pct)
+        self.debug('WinPct:@wpct [@rWins/@total], PCT:@pct', \
+                   wpct=_winPct, rWins=_rWins, total=_total, pct=_pct)
         return _pct
 
 class CompareOverallRecord(SumoBoutCompare):

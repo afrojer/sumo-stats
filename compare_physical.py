@@ -51,7 +51,10 @@ class CompareBMI(SumoBoutCompare):
         # his opponent, and negative numbers for an opponent with
         # higher BMI than the rikishi
         _bmiDiff = matchup.rikishi.bmi() - matchup.opponent.bmi()
-        return _bmiDiff / _bmiRange
+        _pct = _bmiDiff / _bmiRange
+
+        self.debug('BMIDiff:@bmi, PCT:@pct', bmi=_bmiDiff, pct=_pct)
+        return _pct
 
 class CompareHeight(SumoBoutCompare):
     """
@@ -70,7 +73,10 @@ class CompareHeight(SumoBoutCompare):
         # rikishi taller than his opponent, and negative numbers for an
         # opponent taller than the rikishi
         _diff = matchup.rikishi.height() - matchup.opponent.height()
-        return _diff / _heightDiffRange
+        _pct = _diff / _heightDiffRange
+
+        self.debug('HeightDiff:@height, PCT:@pct', height=_diff, pct=_pct)
+        return _pct
 
 class CompareWeight(SumoBoutCompare):
     """
@@ -89,5 +95,8 @@ class CompareWeight(SumoBoutCompare):
         # rikishi heavier than his opponent, and negative numbers for an
         # opponent heavier than the rikishi
         _diff = matchup.rikishi.weight() - matchup.opponent.weight()
-        return _diff / _weightDiffRange
+        _pct = _diff / _weightDiffRange
+
+        self.debug('WeightDiff:@weight, PCT:@pct', weight=_diff, pct=_pct)
+        return _pct
 

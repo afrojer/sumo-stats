@@ -45,10 +45,10 @@ predictor = SumoBoutPredictor(sumodata)
 #
 physical_comparison:list[SumoBoutCompare] = [ \
     CompareBMI(sumodata, 0.3), \
-    CompareHeight(sumodata, 0.3), \
-    CompareWeight(sumodata, 0.3), \
-    CompareRank(sumodata, 2.0), \
-    CompareBashoRecord(sumodata, 1.5), \
+    CompareHeight(sumodata, 0.2), \
+    CompareWeight(sumodata, 0.2), \
+    CompareRank(sumodata, 1.5), \
+    CompareBashoRecord(sumodata, 1.8), \
     CompareHeadToHead(sumodata, 1.7), \
     CompareOverallRecord(sumodata, 1.2)
 ]
@@ -85,7 +85,7 @@ for bout in boutlist:
     eastMatchup = sumodata.get_matchup(east.id(), west.id())
 
     # Run the prediction!
-    projectedWinner, confidence = predictor.predict(eastMatchup, basho, day)
+    projectedWinner, confidence = predictor.predict(eastMatchup, basho, day, DEBUG=True)
 
     #
     # Print Stats

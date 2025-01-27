@@ -89,7 +89,7 @@ class SumoMatchup():
         matchlist = self.rikishi.matches_by_opponent[opponent.id()]
 
         overall = self._overall
-        overall.total = len(matchlist)
+        # overall.total = len(matchlist)
 
         # map each matchId string to a BashoMatch object and collect them into a list
         # overall.matches = list(map(lambda m: data.matches.get(m), matchlist))
@@ -136,7 +136,9 @@ class SumoMatchup():
                     else:
                         matchup.kimariteLosses[m.kimarite] += 1
 
-    def total_matches(self):
+    def total_matches(self, no_fusen=False):
+        if no_fusen and str(SumoResult.FUSEN) in self._overall.kimariteWins:
+            return self._overall.total - self._overall.kimariteWins[str(SumoResult.FUSEN)]
         return self._overall.total
 
     def overall(self) -> RikishiMatchup:
