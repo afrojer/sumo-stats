@@ -152,6 +152,7 @@ comparisons:list[SumoBoutCompare] = [ \
     CompareBMI(sumodata, 0.3), \
     CompareHeight(sumodata, 0.2), \
     CompareWeight(sumodata, 0.2), \
+    CompareAge(sumodata, 0.2), \
     CompareRank(sumodata, 1.3), \
     CompareBashoRecord(sumodata, 1.8), \
     CompareHeadToHeadFull(sumodata, 0.8), \

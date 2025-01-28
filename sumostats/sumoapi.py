@@ -79,12 +79,7 @@ class SumoAPI:
 
         j = self._get_json(url, params)
         if not j:
-            sys.stderr.write(f'Could not find rikishi:{rikishiId} (once more?)\n')
-            SumoAPI._DEBUG = True
-            j = self._get_json(url, params)
-            SumoAPI._DEBUG = False
-            if not j:
-                sys.stderr.write(f'Could not find rikishi:{rikishiId} (once more?)\n')
+            sys.stderr.write(f'Could not find rikishi:{rikishiId}\n')
             return None
         return Rikishi.from_dict(j)
 

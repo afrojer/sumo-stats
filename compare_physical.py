@@ -86,7 +86,7 @@ class CompareWeight(SumoBoutCompare):
     The lightest recorded Sumo wrestler is 73kg (Tamatsubaki Kentarō)
 
     """
-    def compare(self, matchup, basho, division, day):
+    def compare(self, matchup, basho, division, day) -> float:
         _maxWeight = 292.6 # kg
         _minWeight = 73.0 # kg
         _weightDiffRange = _maxWeight - _minWeight
@@ -98,5 +98,29 @@ class CompareWeight(SumoBoutCompare):
         _pct = _diff / _weightDiffRange
 
         self.debug('WeightDiff:@weight, PCT:@pct', weight=_diff, pct=_pct)
+        return _pct
+
+class CompareAge(SumoBoutCompare):
+    """
+    Compare rikishi based on age
+
+    Rikishi generally enter Jonokuchi at 16
+    The oldest recorded sumo wrestler was 52 (Miyagino Nishikinosuke, 1744 – July 18, 1798)
+
+    """
+    def compare(self, matchup, basho, division, day) -> float:
+        _maxAge = 52.0 * 365.25
+        _minAge = 16.0 * 365.25
+        _ageDiffRange = _maxAge - _minAge
+
+        # using rikishi as the numerator will produce positive numbers for a
+        # rikishi heavier than his opponent, and negative numbers for an
+        # opponent heavier than the rikishi
+        _diff = matchup.rikishi.age(basho.date()) - matchup.opponent.age(basho.date())
+        _pct = _diff / _ageDiffRange
+
+        self.debug('AgeDiff:@agediff [@rAge, @oAge], PCT:@pct', \
+                   agediff=_diff, rAge=matchup.rikishi.age(basho.date()), \
+                   oAge=matchup.opponent.age(basho.date()), pct=_pct)
         return _pct
 

@@ -23,7 +23,7 @@ class SumoBoutCompare():
         if not self._data:
             raise Exception('data cannot be empty/None')
 
-    def compare(self, matchup:SumoMatchup, basho:SumoTournament, division:SumoDivision, day:int):
+    def compare(self, matchup:SumoMatchup, basho:SumoTournament, division:SumoDivision, day:int) -> float:
         """
         Override this method
 
@@ -32,9 +32,9 @@ class SumoBoutCompare():
           (0, 1] to favor rikishi
           [0] to pass-through with no opinion about this matchup
         """
-        pass
+        return 0.0
 
-    def weight(self):
+    def weight(self) -> float:
         return self._weight
 
     def debug(self, fmtStr, **kwargs):
@@ -44,7 +44,7 @@ class SumoBoutCompare():
             fmtStr = fmtStr.replace(f'@{key}', repr(value))
         sys.stdout.write(f'  {type(self).__name__}: {fmtStr}\n')
 
-    def __call__(self, matchup:SumoMatchup, basho:SumoTournament, division:SumoDivision, day:int, DEBUG=False):
+    def __call__(self, matchup:SumoMatchup, basho:SumoTournament, division:SumoDivision, day:int, DEBUG=False) -> float:
         self._DEBUG = DEBUG
         result = self.compare(matchup, basho, division, day) * self._weight
         self._DEBUG = False

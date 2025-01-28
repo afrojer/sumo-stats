@@ -20,17 +20,20 @@ class SumoWrestler():
     def __str__(self):
         return f'{self.shikonaEn()}({self.rikishi.id})'
 
-    def id(self):
+    def id(self) -> int:
         return self.rikishi.id
 
-    def height(self):
+    def height(self) -> float:
         return self.rikishi.height
 
-    def weight(self):
+    def weight(self) -> float:
         return self.rikishi.weight
 
-    def bmi(self):
+    def bmi(self) -> float:
         return self.rikishi.bmi
+
+    def age(self, inBasho:date = None) -> float:
+        return float(self.rikishi.age(inBasho))
 
     def shikonaEn(self, bashoDate:date = None):
         if not bashoDate:

@@ -200,7 +200,7 @@ class RikishiMeasurement:
 @dataclass()
 class RikishiRank:
     id: str = ''
-    bashoId: date = field(default='0001-01-01', metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
     rikishiId: int = -1
     rankValue: int = -1
     rank: str = ''
@@ -240,7 +240,7 @@ class RikishiRank:
 @dataclass()
 class RikishiShikona:
     id: str = ''
-    bashoId: date = field(default='0001-01-01', metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
     rikishiId: int = -1
     shikonaEn: str = ''
     shikonaJp: str = ''
@@ -277,15 +277,15 @@ class Rikishi:
     currentRank: str = ''
     currentRankValue: int = -1
     heya: str = ''
-    birthDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
+    birthDate: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     shusshin: str = ''
     height: float = 0.0
     weight: float = 0.0
     bmi: float = 0.0
-    debut: date = field(default='0001-01-01', metadata=dcjson_config(decoder=_decode_date))
-    updatedAt: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
-    createdAt: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
-    intai: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
+    debut: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
+    updatedAt: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
+    createdAt: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
+    intai: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     measurementHistory: list[RikishiMeasurement] = field(default_factory=list)
     rankHistory: list[RikishiRank]  = field(default_factory=list)
     shikonaHistory: list[RikishiShikona] = field(default_factory=list)
@@ -319,9 +319,20 @@ class Rikishi:
 
     def retired(self):
         return True if self.intai.timestamp() > 0 else False
-
     def isValid(self):
         return self.id > 0
+
+    def age(self, inBasho:date = None) -> int:
+        """
+        return rikishi age in days
+        """
+        if self.birthDate == datetime(1,1,1):
+            return 0
+        # valid birthday
+        _bday = self.birthDate.date()
+        if inBasho:
+            return (inBasho - _bday).days
+        return (date.today() - _bday).days
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
@@ -342,7 +353,7 @@ class SpecialPrize:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class BashoMatch:
-    bashoId: date = field(default='0001-01-01', metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
     division: SumoDivision = SumoDivision.UNKNOWN
     day: int = -1
     matchNo: int = -1
@@ -386,9 +397,9 @@ class RikishiMatchup:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class Basho:
-    bashoDate: date = field(default='0001-01-01', metadata=dcjson_config(field_name="date", decoder=_decode_date))
-    startDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
-    endDate: datetime = field(default='0001-01-01T00:00:00+00:00', metadata=dcjson_config(decoder=_decode_datetime))
+    bashoDate: date = field(default=date(1,1,1), metadata=dcjson_config(field_name="date", decoder=_decode_date))
+    startDate: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
+    endDate: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     yusho: list[Yusho] = field(default_factory=list)
     specialPrizes: list[SpecialPrize] = field(default_factory=list)
     location: str = ''
@@ -438,7 +449,7 @@ class BanzukeRikishi:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class Banzuke:
-    bashoId: date = field(default='0001-01-01', metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
     division: SumoDivision = SumoDivision.UNKNOWN
     east: list[BanzukeRikishi] = field(default_factory=list)
     west: list[BanzukeRikishi] = field(default_factory=list)
