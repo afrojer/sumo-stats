@@ -11,6 +11,8 @@ import sys
 cdir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(cdir)
 
+import argparse
+
 from dataclasses import dataclass
 
 from sumostats.sumodata import *
@@ -40,10 +42,17 @@ def GetProjectedWinners(sumodata, predictor, basho, division, day, boutlist, DEB
         eastMatchup = sumodata.get_matchup(bout.eastId, bout.westId)
 
         # Run the prediction!
+        if DEBUG:
+            east = sumodata.get_rikishi(bout.eastId)
+            west = sumodata.get_rikishi(bout.westId)
+            sys.stdout.write(f'{east} vs. {west}\n')
         projectedWinner, confidence = predictor.predict(eastMatchup, basho, division, day, DEBUG=DEBUG)
 
         binfo.projectedWinner = projectedWinner
         binfo.projectionConfidence = confidence
+        if DEBUG:
+            sys.stdout.write(f'  ProjectedWinner: {projectedWinner} ({confidence})\n')
+            sys.stdout.write(f'  ActualWinner: {binfo.winner}\n')
 
         bout_info.append(binfo)
 
@@ -126,17 +135,104 @@ def PrintBoutInfo(sumodata, basho_match, eastId, eastRecord, westId, westRecord)
 
     sys.stdout.write('\n\n')
 
+def PredictAndPrintBasho(args, sumodata, predictor, basho, division):
+    bout_info_on_day:dict[int, list[BoutInfo]] = {}
+
+    banzuke = basho.get_banzuke(division)
+
+    num_days = basho.num_days()
+    for day in range(1, num_days+1):
+        boutlist = basho.get_bouts_in_division_on_day(division, day)
+        bout_info_on_day[day] = GetProjectedWinners(sumodata, predictor, basho, division, day, boutlist, \
+                                                    DEBUG=args.debug_prediction)
+
+    correctPredictions = 0
+    totalPredictions = 0
+
+    # Print it all out
+    for day in range(1, num_days+1):
+        if args.verbose > 0:
+            print(f'\n{"*"*79}\nBasho {basho.id_str()}, Day {day}, {division}')
+        for bout in bout_info_on_day[day]:
+            east = sumodata.get_rikishi(bout.match.eastId)
+            eastRecord = banzuke.get_record_on_day(east.id(), day)
+            west = sumodata.get_rikishi(bout.match.westId)
+            westRecord = banzuke.get_record_on_day(west.id(), day)
+
+            if args.verbose > 0:
+                if args.verbose > 1:
+                    PrintBoutInfo(sumodata, bout.match, east.id(), eastRecord, west.id(), westRecord)
+                else:
+                    sys.stdout.write(f'\nMatch {bout.match.matchNo}\n')
+                    sys.stdout.write(f'    {east} vs. {west}\n')
+
+            # After the bout info, print out the projected winner and actual winner
+            if args.verbose > 0:
+                sys.stdout.write(f'        Projected Winner: {bout.projectedWinner}, Confidence:{abs(bout.projectionConfidence):.2%}\n')
+            if bout.winner:
+                if args.verbose > 0:
+                    sys.stdout.write(f'        Actual Winner: {bout.winner}\n')
+                if bout.projectedWinner.id() == bout.winner.id():
+                    correctPredictions += 1
+            totalPredictions += 1
+
+    if args.verbose > 0:
+        sys.stdout.write('\n\n')
+
+    pct = float(correctPredictions) / float(totalPredictions)
+    print(f'Total Predictions: {totalPredictions}')
+    print(f'Correct Predictions: {correctPredictions} ({pct:.2%})')
+
+
 ########################################################################
 #
 # Main
 #
 ########################################################################
+if not __name__ == '__main__':
+    sys.exit(0)
 
-# Load data
+#
+# Setup argument parsing
+#
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-b', '--basho', dest='basho', type=str, metavar='YYYYMM', nargs='+', \
+                    action='extend', required=True, \
+                    help='Basho to predict. Format is YYYYMM, e.g., 202501. This argument can be repeated to predict multiple basho')
+parser.add_argument('-d', '--division', dest='division', type=str, metavar='DIVISION', \
+                    default='Makuuchi', \
+                    choices=list(map(lambda d: str(d.value), (SumoDivision))), \
+                    help='Sumo division in Basho to predict.')
+parser.add_argument('--force_fetch', action='store_true', \
+                    help='Force fetching of basho data from SumoAPI service')
+parser.add_argument('--db', type=str, metavar='<DATA_FILE>', \
+                    default='sumo_data.pickle', \
+                    help='All data from the SumoAPI server will be cached in this file.')
+parser.add_argument('-v', '--verbose', dest='verbose', action='count', \
+                    default=0, \
+                    help='Increase verbosity of output')
+
+parser.add_argument('--debug_prediction', action='store_true', \
+                    help='Turn on prediction debuging')
+parser.add_argument('--debug_api', action='store_true', \
+                    help='Turn on API debuging')
+
+args = parser.parse_args()
+
+# debug and verbose flags get passed to class-level values so we can easily
+# enable API debugging if we want
+if args.debug_api:
+    SumoAPI._DEBUG=True
+if args.verbose > 2:
+    SumoAPI._VERBOSE=args.verbose - 2
+
+# Load any saved data
 sumodata = None
 try:
     # save data to avoid lots of API queries
-    sumodata = SumoData.load_data('./sumo_data.pickle')
+    sumodata = SumoData.load_data(args.db)
 except:
     sumodata = SumoData()
 
@@ -161,55 +257,26 @@ comparisons:list[SumoBoutCompare] = [ \
 ]
 predictor.add_comparisons(comparisons)
 
+# set the division to focus on from the input arguments
+division = SumoDivision(args.division)
 
-# load the 2025-01 basho data and fetch the latest info from the server
-basho = sumodata.get_basho('202501', SumoDivision.Makuuchi)
-if not basho:
-    basho = sumodata.get_basho('202501', SumoDivision.Makuuchi, fetch=True)
+# load the basho data and fetch the latest info from the server
+basho_list = []
+for b in args.basho:
+    if args.verbose > 0:
+        sys.stdout.write(f'Loading basho {b}...\n')
+    _basho =sumodata.get_basho(b, division, fetch=args.force_fetch)
+    if not _basho:
+        _basho = sumodata.get_basho(b, division, fetch=True)
+    if _basho:
+        basho_list.append(_basho)
 
 # save the data we just fetched
-sumodata.save_data('./sumo_data.pickle')
-#sumodata.print_table_stats()
+sumodata.save_data(args.db)
+if args.verbose > 0:
+    sumodata.print_table_stats()
 
 
-bout_info_on_day:dict[int, list[BoutInfo]] = {}
-
-division = SumoDivision.Makuuchi
-banzuke = basho.get_banzuke(division)
-
-num_days = basho.num_days()
-for day in range(1, num_days+1):
-    boutlist = basho.get_bouts_in_division_on_day(division, day)
-    bout_info_on_day[day] = GetProjectedWinners(sumodata, predictor, basho, division, day, boutlist, DEBUG=False)
-
-
-correctPredictions = 0
-totalPredictions = 0
-
-# Print it all out
-for day in range(1, num_days+1):
-    print(f'\n{"*"*79}\nBasho {basho.id_str()}, Day {day}, {division}')
-    for bout in bout_info_on_day[day]:
-        east = sumodata.get_rikishi(bout.match.eastId)
-        eastRecord = banzuke.get_record_on_day(east.id(), day)
-        west = sumodata.get_rikishi(bout.match.westId)
-        westRecord = banzuke.get_record_on_day(west.id(), day)
-
-        sys.stdout.write(f'\nMatch {bout.match.matchNo}\n')
-        sys.stdout.write(f'    {east} vs. {west}\n')
-        # PrintBoutInfo(sumodata, bout.match, eastId, eastRecord, westId, westRecord)
-
-        # After the bout info, print out the projected winner and actual winner
-        sys.stdout.write(f'        Projected Winner: {bout.projectedWinner}, Confidence:{abs(bout.projectionConfidence):.2%}\n')
-        if bout.winner:
-            sys.stdout.write(f'        Actual Winner: {bout.winner}\n')
-            if bout.projectedWinner.id() == bout.winner.id():
-                correctPredictions += 1
-        totalPredictions += 1
-
-sys.stdout.write('\n\n')
-
-pct = float(correctPredictions) / float(totalPredictions)
-print(f'Total Predictions: {totalPredictions}')
-print(f'Correct Predictions: {correctPredictions} ({pct:.2%})')
+for basho in basho_list:
+    PredictAndPrintBasho(args, sumodata, predictor, basho, division)
 
