@@ -3,7 +3,7 @@
 import json
 import re
 from enum import Enum
-from datetime import datetime, date
+from datetime import datetime, date, MINYEAR
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, Undefined, config as dcjson_config
 from .sumoclassdata import _RikishiRankValue
@@ -314,11 +314,17 @@ class Rikishi:
             s += f'\n{self.id}: ShikonaHistory={list(map(str, self.shikonaHistory))}'
         return s
 
+    def short_desc(self):
+        s = f'{self.id}: {self.shikonaEn}'
+        if self.retired():
+            s += f' (retired since {self.intai})'
+        return s
+
     def name(self):
         return self.shikonaEn
 
     def retired(self):
-        return True if self.intai.timestamp() > 0 else False
+        return True if self.intai.year > MINYEAR else False
     def isValid(self):
         return self.id > 0
 
