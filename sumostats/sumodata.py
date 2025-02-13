@@ -536,10 +536,10 @@ class SumoData:
         Create a SumoMatchup object for all bouts between the specified rikishi and opponent
         """
         if not rikishi in self.rikishi:
-            sys.stderr.write(f'Unknown rikishiId:{rikishi}\n')
+            # sys.stderr.write(f'Unknown rikishiId:{rikishi}\n')
             return None
         if not opponent in self.rikishi:
-            sys.stderr.write(f'Unknown opponentId:{opponent}\n')
+            # sys.stderr.write(f'Unknown opponentId:{opponent}\n')
             return None
 
         return SumoMatchup(self, self.rikishi[rikishi], self.rikishi[opponent])
@@ -587,7 +587,7 @@ class SumoData:
         """
         basho = self.api.basho(BashoIdStr(bashoDate))
         if not basho or not basho.isValid():
-            sys.stderr.write(f'Could not query basho:{bashoDate}\n')
+            sys.stderr.write(f'Error when querying basho:{bashoDate}\n')
             return
         self._add_basho(basho, division, forceUpdate=True)
         return
@@ -655,7 +655,7 @@ class SumoData:
         if b.bashoDate in self.basho:
             # Assume we already know about this one
             if not forceUpdate:
-                sys.stderr.write(f'Skipping tournament: {b.id_str()} (already in table)\n')
+                # sys.stderr.write(f'Skipping tournament: {b.id_str()} (already in table)\n')
                 return
             sys.stderr.write(f'Updating tournament: {b.id_str()} (from API source)\n')
             tournament = self.basho[b.bashoDate]
@@ -682,7 +682,7 @@ class SumoData:
         # Use the API to grab banzuke info
         banzuke = self.api.basho_banzuke(tournament.id_str(), division)
         if not banzuke:
-            sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id_str()}')
+            # sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id_str()}')
             return
 
         # Updates will just replace the banzuke
@@ -699,8 +699,8 @@ class SumoData:
                 #bouts = rikishi.wins + rikishi.losses + rikishi.absences
                 #if bouts > max_bouts:
                 #    max_bouts = bouts
-        else:
-            sys.stderr.write(f'No east side in banzuke:{banzuke}\n')
+        #else:
+        #    sys.stderr.write(f'WARNING: No east side in banzuke:{banzuke}\n')
 
         if banzuke.west:
             for rikishi in banzuke.west:
@@ -710,8 +710,8 @@ class SumoData:
                 #bouts = rikishi.wins + rikishi.losses + rikishi.absences
                 #if bouts > max_bouts:
                 #    max_bouts = bouts
-        else:
-            sys.stderr.write(f'No west side in banzuke:{banzuke}\n')
+        #else:
+        #    sys.stderr.write(f'No west side in banzuke:{banzuke}\n')
 
         # For each day of the tournament, add the torikumi
         for day in range(1, max_bouts+1):
@@ -741,7 +741,7 @@ class SumoData:
             # Add the opponent if we haven't seen them before
             if not record.opponentID in self.rikishi:
                 if not self._add_rikishi(record.opponentID, record.opponentShikonaEn, f'{record.opponentShikonaEn}({record.opponentID})'):
-                    sys.stderr.write(f'Could not add opponent ({record.opponentShikonaEn}[{record.opponentID}]) of {r.desc()}\n')
+                    sys.stderr.write(f'ERROR: Could not add opponent ({record.opponentShikonaEn}[{record.opponentID}]) of {r.desc()}\n')
             # Add this wrestler's record vs. the opponent
             if record.opponentID > 0 and (force_update or not record.opponentID in w.matches_by_opponent):
                 w.matches_by_opponent[record.opponentID] = []
@@ -765,7 +765,7 @@ class SumoData:
         # find the wrestler
         rikishi = self.api.rikishi(rikishiId, measurements=True, ranks=True, shikonas=True)
         if not rikishi:
-            sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
+            # sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
             rikishi = Rikishi(id=rikishiId, shikonaEn=shikonaEn)
             # TODO: use self.api.rikishis() and search by shikonaEn?
 
@@ -774,7 +774,7 @@ class SumoData:
         # get some extra stats
         stats = self.api.rikishi_stats(rikishiId)
         if not stats:
-            sys.stderr.write(f'Cannot find stats for {desc}: creating blank entry')
+            # sys.stderr.write(f'Cannot find stats for {desc}: creating blank entry')
             stats = RikishiStats()
 
         all_matches = []
