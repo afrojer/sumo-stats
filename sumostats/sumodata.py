@@ -765,9 +765,17 @@ class SumoData:
         # find the wrestler
         rikishi = self.api.rikishi(rikishiId, measurements=True, ranks=True, shikonas=True)
         if not rikishi:
-            # sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
-            rikishi = Rikishi(id=rikishiId, shikonaEn=shikonaEn)
-            # TODO: use self.api.rikishis() and search by shikonaEn?
+            # Try to find the rikishi in a list of retired rikishi, searching
+            # by shikonaEn
+            rikishi_list = self.api.rikishis(limit=1, skip=0, retired=True, \
+                                             measurements=True, ranks=True, shikonas=True, \
+                                             shikonaEn=shikonaEn )
+            if len(rikishi_list) >= 1:
+                rikishi = rikishi_list[0]
+                # sys.stderr.write(f'Found possibly retired Rikishi "{desc}": {rikishi.short_desc()}\n')
+            else:
+                # sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
+                rikishi = Rikishi(id=rikishiId, shikonaEn=shikonaEn)
 
         sys.stdout.write(f'    Adding wrestler:{desc}...{" "*50}\n')
 
