@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 from .sumoapi import *
+from .version import __data_version__
 
 from datetime import date
 from dateutil.relativedelta import *
 import pickle
 import sys
+import os
+import tempfile
 
 class SumoWrestler():
     def __init__(self, r: Rikishi, s: RikishiStats):
@@ -434,6 +437,11 @@ class SumoTournament():
 
     def get_banzuke(self, division: SumoDivision) -> SumoBanzuke:
         if not division in self.banzuke:
+            # if SumoData._VERBOSE > 1:
+            #     sys.stderr.write(f'NO "{division}"({type(division).__name__}) in [')
+            #     for k in self.banzuke.keys():
+            #         sys.stderr.write(f'{k}({type(k).__name__}),')
+            #     sys.stderr.write(']\n')
             return None
         return self.banzuke[division]
 
@@ -488,22 +496,56 @@ class SumoTournament():
 class SumoData:
     """ Build a database of sumo wrestlers and match data """
 
+    _VERBOSE = 0
+
     def __init__(self):
         self.api = SumoAPI()
         self.rikishi: dict[int, SumoWrestler] = {}
         self.basho: dict[date, SumoTournament] = {}
         self.matches: dict[str, BashoMatch] = {}
+        self.version: str = __data_version__
         return
 
     """
     Public Methods
 
     """
+
+    # Static method
+    def load_data(path):
+        """ Load a SumoData from a file """
+        f = open(path, 'rb')
+        try:
+            table = pickle.load(f)
+        except:
+            table = SumoData()
+        f.close()
+        if not isinstance(table, SumoData):
+            raise Exception(f'Invalid saved table file at {path}: not a SumoData')
+        if table.version != __data_version__:
+            raise Exception(f'Saved data version {table.version} is not compatible with this version {__data_version__}')
+        return table
+
+    def save_data(self, path):
+        """ Save SumoData instance to a file """
+
+        # write to a temp file, then attempt to atomically replace
+        # the requested path with a successfully written pickle file
+        tmp_file = tempfile.NamedTemporaryFile(dir=os.path.dirname(path), delete=False)
+        try:
+            pickle.dump(self, tmp_file)
+            tmp_file.close()
+            os.replace(tmp_file.name, path)
+        except Exception:
+            os.remove(tmp_file.name)
+            raise
+        return
+
     def print_table_stats(self):
         print(f'SumoData[rikishi={len(self.rikishi.values())}, basho={len(self.basho.values())}, matches={len(self.matches.values())}]')
         return
 
-    def get_basho(self, bashoStr, division=SumoDivision.UNKNOWN, fetch=False) -> SumoTournament:
+    def get_basho(self, bashoStr, division: [SumoDivision] = [], fetch=False) -> SumoTournament:
         d = BashoDate(bashoStr)
         if fetch:
             self.update_basho(d, division=division)
@@ -561,26 +603,31 @@ class SumoData:
     def get_rikishi_basho_record_by_day(self, rikishiId, bashoStr, day):
         return
 
-    def load_data(path):
-        """ Load a SumoData from a file """
-        f = open(path, 'rb')
-        try:
-            table = pickle.load(f)
-        except:
-            table = None
-        f.close()
-        if not isinstance(table, SumoData):
-            raise Exception(f'Invalid saved table file at {path}: not a SumoData')
-        return table
+    def find_next_basho(self, startDate: date, endDate = None) -> str:
+        """
+        Find the basho data string which occurred (will occur) as close to the given startDate as possible.
+        For example, given a date of 2022-02-13, this function would return '202203'
+        This will only search up to one year
+        """
+        # Find the closest date which successfully returns a basho
+        bashoDate = startDate.replace(day=1)
+        lastDate = endDate
+        if not lastDate:
+            lastDate = startDate + relativedelta(years=1)
+        basho = None
+        while True:
+            basho = self.api.basho(BashoIdStr(bashoDate))
+            if (basho and basho.isValid()) or bashoDate > lastDate:
+                break
+            bashoDate = bashoDate + relativedelta(months=1)
 
-    def save_data(self, path):
-        """ Save SumoData instance to a file """
-        f = open(path, 'wb')
-        pickle.dump(self, f)
-        f.close()
-        return
+        if bashoDate > lastDate:
+            if SumoData._VERBOSE > 1:
+                sys.stderr.write(f'Could not find a basho between {startDate} and {lastDate}\n')
+            bashoDate = __EMPTY_BASHO_DATE__
+        return BashoIdStr(bashoDate)
 
-    def update_basho(self, bashoDate: date, division: SumoDivision = SumoDivision.UNKNOWN):
+    def update_basho(self, bashoDate: date, division: [SumoDivision] = []):
         """
         Update information in the table with date pulled fresh from the API data source.
         This is most useful for in-progress tournaments.
@@ -592,7 +639,7 @@ class SumoData:
         self._add_basho(basho, division, forceUpdate=True)
         return
 
-    def add_basho_by_date_range(self, startDate: date, endDate: date, division: SumoDivision = SumoDivision.UNKNOWN):
+    def add_basho_by_date_range(self, startDate: date, endDate: date, division: [SumoDivision] = []):
         # sanity check the dates
         if endDate < startDate:
             raise Exception('endDate:{endDate} must be later than startDate:{startDate}')
@@ -647,31 +694,45 @@ class SumoData:
 
     """
 
-    def _add_basho(self, b: Basho, division: SumoDivision, forceUpdate = False):
+    def _add_basho(self, b: Basho, division: [SumoDivision], forceUpdate = False):
         if not b or not b.isValid():
             return
 
         tournament = None
         if b.bashoDate in self.basho:
-            # Assume we already know about this one
-            if not forceUpdate:
-                # sys.stderr.write(f'Skipping tournament: {b.id_str()} (already in table)\n')
-                return
-            sys.stderr.write(f'Updating tournament: {b.id_str()} (from API source)\n')
             tournament = self.basho[b.bashoDate]
+
+            # check that we have data for each division
+            missing_division = False
+            check_division = division if len(division) > 0 else (SumoDivision)
+            for div in check_division:
+                if div != SumoDivision.UNKNOWN and not tournament.get_banzuke(div):
+                    if SumoData._VERBOSE > 0:
+                        sys.stderr.write(f'!Tournament {b.id_str()} missing division: {div}\n')
+                    missing_division = True
+            # Assume we already know about this one
+            if missing_division or forceUpdate:
+                sys.stderr.write(f'Updating tournament: {b.id_str()} (from API source)\n')
+            else:
+                # we already know about all the divisions in this basho
+                if SumoData._VERBOSE > 1:
+                    sys.stderr.write(f'Skipping tournament: {b.id_str()} (already in table)\n')
+                return
+
             tournament.basho = b
         else:
-            sys.stdout.write(f'Add New SumoTournament: {b.id_str()}\n')
+            sys.stdout.write(f'\nAdd New SumoTournament: {b.id_str()}\n')
             # Add this basho to our table as a set of Tournament objects
             tournament = SumoTournament(b)
 
         # retrieve the set of banzuke for this basho
-        if division == SumoDivision.UNKNOWN:
+        if len(division) == 0:
             for div in (SumoDivision):
                 if div != SumoDivision.UNKNOWN:
-                    self._add_banzuke(tournament, div.value, forceUpdate)
+                    self._add_banzuke(tournament, div, forceUpdate)
         else:
-            self._add_banzuke(tournament, division, forceUpdate)
+            for div in division:
+                self._add_banzuke(tournament, div, forceUpdate)
 
         # add the tournament to our table
         self.basho[b.bashoDate] = tournament
@@ -682,11 +743,12 @@ class SumoData:
         # Use the API to grab banzuke info
         banzuke = self.api.basho_banzuke(tournament.id_str(), division)
         if not banzuke:
-            # sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id_str()}')
+            if SumoData._VERBOSE > 1:
+                sys.stderr.write(f'    ERROR: No {division} banzuke found for basho:{tournament.id_str()}')
             return
 
         # Updates will just replace the banzuke
-        tournament.banzuke[division] = SumoBanzuke(banzuke)
+        tournament.banzuke[SumoDivision(division)] = SumoBanzuke(banzuke)
 
         max_bouts = 0
 
@@ -716,6 +778,7 @@ class SumoData:
         # For each day of the tournament, add the torikumi
         for day in range(1, max_bouts+1):
             self._add_torikumi(tournament, division, day)
+        sys.stdout.write('\n')
 
         return
 
@@ -750,7 +813,8 @@ class SumoData:
                 while True:
                     matches, matchup = self.api.rikishi_matches(r.rikishiId, opponentId = record.opponentID, limit = limit, skip = skip)
                     for m in matches:
-                        # assume the match is already in the "all_matches" list,
+                        # assume the match is already in the "all_matches" list
+                        # (from the _add_rikishi() call above)
                         # and just keep track of the matchId here
                         w.matches_by_opponent[record.opponentID].append(m.matchId)
                     sys.stdout.write(f'    Adding wrestler:{r.desc()} +{len(matches)} matches vs. {record.opponentID}{" "*40}\r')
@@ -772,9 +836,11 @@ class SumoData:
                                              shikonaEn=shikonaEn )
             if len(rikishi_list) >= 1:
                 rikishi = rikishi_list[0]
-                # sys.stderr.write(f'Found possibly retired Rikishi "{desc}": {rikishi.short_desc()}\n')
+                if SumoData._VERBOSE > 1:
+                    sys.stderr.write(f'Found possibly retired Rikishi "{desc}": {rikishi.short_desc()}\n')
             else:
-                # sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
+                if SumoData._VERBOSE > 2:
+                    sys.stderr.write(f'No Rikishi data for "{desc}" from API: creating blank entry\n')
                 rikishi = Rikishi(id=rikishiId, shikonaEn=shikonaEn)
 
         sys.stdout.write(f'    Adding wrestler:{desc}...{" "*50}\n')
@@ -792,6 +858,8 @@ class SumoData:
         skip = 0
         while True:
             matchlist, _ = self.api.rikishi_matches(rikishiId, limit = limit, skip = skip)
+            # iterate over the match list and add each one to "all_matches"
+            # (the list() is needed to actually invoke the map lambda for each object)
             list(map(lambda m: self._set_match(m), matchlist))
             for m in matchlist:
                 all_matches.append(m.matchId)
@@ -806,7 +874,7 @@ class SumoData:
         return True
 
     def _add_torikumi(self, t: SumoTournament, division: SumoDivision, day):
-        sys.stdout.write(f'    Add Day {day} Torikumi for {division}{" "*50}\n')
+        sys.stdout.write(f'    Add Day {day} Torikumi for {division}{" "*50}\r')
 
         # grab the day's torikumi in the givin division
         torikumi = self.api.basho_torikumi(t.id_str(), division, day)
@@ -826,10 +894,10 @@ class SumoData:
                     self._add_rikishi(match.westId, match.westShikona, f'W:{match.westShikona}({match.westId})')
             # Add the torikumi to the banzuke object
             # (assume the banzuke object exists)
-            t.banzuke[division].add_torikumi(day, torikumi.torikumi)
+            t.banzuke[SumoDivision(division)].add_torikumi(day, torikumi.torikumi)
         else:
-            t.torikumi_by_day[day][division] = []
-            t.torikumi_by_division[division][day] = []
+            t.torikumi_by_day[day][SumoDivision(division)] = []
+            t.torikumi_by_division[SumoDivision(division)][day] = []
 
         return
 

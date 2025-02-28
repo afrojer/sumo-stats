@@ -265,9 +265,9 @@ basho_list = []
 for b in args.basho:
     if args.verbose > 0:
         sys.stdout.write(f'Loading basho {b}...\n')
-    _basho =sumodata.get_basho(b, division, fetch=args.force_fetch)
+    _basho =sumodata.get_basho(b, [division], fetch=args.force_fetch)
     if not _basho:
-        _basho = sumodata.get_basho(b, division, fetch=True)
+        _basho = sumodata.get_basho(b, [division], fetch=True)
     if _basho:
         basho_list.append(_basho)
 

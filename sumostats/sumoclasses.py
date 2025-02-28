@@ -8,11 +8,12 @@ from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, Undefined, config as dcjson_config
 from .sumoclassdata import _RikishiRankValue
 
+__EMPTY_BASHO_DATE__: date = date(1,1,1)
+
 def _decode_datetime(datestr):
     """ custom decoder for older python versions that don't like the 'Z' in for iso date format """
     #print(f'INPUT:{datestr}')
     return datetime.fromisoformat(datestr.replace('Z', '+00:00'))
-
 
 def _decode_date(datestr):
     """ custom decoder for older python versions that only like YYYY-MM-DD """
@@ -20,6 +21,8 @@ def _decode_date(datestr):
     while len(datestr) < 8:
         datestr  += '01'
     m = re.match(r'(\d{4})(\d{2})(\d{2})', datestr)
+    if not m:
+        return __EMPTY_BASHO_DATE__
     return date.fromisoformat(f'{m.group(1)}-{m.group(2)}-{m.group(3)}')
 
 def BashoIdStr(bashoId: date):
@@ -29,7 +32,10 @@ def BashoDate(bashoStr: str):
     while len(bashoStr) < 8:
         bashoStr += '01'
     m = re.match(r'(\d{4})(\d{2})(\d{2})', bashoStr)
+    if not m:
+        return __EMPTY_BASHO_DATE__
     return date.fromisoformat(f'{m.group(1)}-{m.group(2)}-{m.group(3)}')
+
 
 class SumoDivision(Enum):
     Makuuchi = 'Makuuchi'
@@ -200,7 +206,7 @@ class RikishiMeasurement:
 @dataclass()
 class RikishiRank:
     id: str = ''
-    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=__EMPTY_BASHO_DATE__, metadata=dcjson_config(decoder=_decode_date))
     rikishiId: int = -1
     rankValue: int = -1
     rank: str = ''
@@ -240,7 +246,7 @@ class RikishiRank:
 @dataclass()
 class RikishiShikona:
     id: str = ''
-    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=__EMPTY_BASHO_DATE__, metadata=dcjson_config(decoder=_decode_date))
     rikishiId: int = -1
     shikonaEn: str = ''
     shikonaJp: str = ''
@@ -282,7 +288,7 @@ class Rikishi:
     height: float = 0.0
     weight: float = 0.0
     bmi: float = 0.0
-    debut: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
+    debut: date = field(default=__EMPTY_BASHO_DATE__, metadata=dcjson_config(decoder=_decode_date))
     updatedAt: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     createdAt: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     intai: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
@@ -359,7 +365,7 @@ class SpecialPrize:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class BashoMatch:
-    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=__EMPTY_BASHO_DATE__, metadata=dcjson_config(decoder=_decode_date))
     division: SumoDivision = SumoDivision.UNKNOWN
     day: int = -1
     matchNo: int = -1
@@ -403,7 +409,7 @@ class RikishiMatchup:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class Basho:
-    bashoDate: date = field(default=date(1,1,1), metadata=dcjson_config(field_name="date", decoder=_decode_date))
+    bashoDate: date = field(default=__EMPTY_BASHO_DATE__, metadata=dcjson_config(field_name="date", decoder=_decode_date))
     startDate: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     endDate: datetime = field(default=datetime(1,1,1), metadata=dcjson_config(decoder=_decode_datetime))
     yusho: list[Yusho] = field(default_factory=list)
@@ -455,7 +461,7 @@ class BanzukeRikishi:
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass()
 class Banzuke:
-    bashoId: date = field(default=date(1,1,1), metadata=dcjson_config(decoder=_decode_date))
+    bashoId: date = field(default=__EMPTY_BASHO_DATE__, metadata=dcjson_config(decoder=_decode_date))
     division: SumoDivision = SumoDivision.UNKNOWN
     east: list[BanzukeRikishi] = field(default_factory=list)
     west: list[BanzukeRikishi] = field(default_factory=list)
