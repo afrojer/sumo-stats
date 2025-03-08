@@ -33,6 +33,8 @@ class BoutInfo():
 
 def GetProjectedWinners(sumodata, predictor, basho, division, day, boutlist, DEBUG=False) -> list[BoutInfo]:
     bout_info = []
+    if not boutlist:
+        return bout_info
     for bout in boutlist:
         binfo = BoutInfo(bout)
 
@@ -135,22 +137,35 @@ def PrintBoutInfo(sumodata, basho_match, eastId, eastRecord, westId, westRecord)
 
     sys.stdout.write('\n\n')
 
-def PredictAndPrintBasho(args, sumodata, predictor, basho, division):
+def PredictAndPrintBasho(args, sumodata, predictor, basho, division, day = -1):
     bout_info_on_day:dict[int, list[BoutInfo]] = {}
 
     banzuke = basho.get_banzuke(division)
 
-    num_days = basho.num_days()
-    for day in range(1, num_days+1):
+    start_day = 0
+    end_day = 0
+    num_days = 0
+    if day > 0:
+        num_days = 1
+        start_day = day
+        end_day = day + 1
         boutlist = basho.get_bouts_in_division_on_day(division, day)
         bout_info_on_day[day] = GetProjectedWinners(sumodata, predictor, basho, division, day, boutlist, \
+                                                    DEBUG=args.debug_prediction)
+    else:
+        num_days = basho.num_days()
+        start_day = 1
+        end_day = start_day + num_days
+        for day in range(1, num_days+1):
+            boutlist = basho.get_bouts_in_division_on_day(division, day)
+            bout_info_on_day[day] = GetProjectedWinners(sumodata, predictor, basho, division, day, boutlist, \
                                                     DEBUG=args.debug_prediction)
 
     correctPredictions = 0
     totalPredictions = 0
 
     # Print it all out
-    for day in range(1, num_days+1):
+    for day in range(start_day, end_day):
         if args.verbose > 0:
             print(f'\n{"*"*79}\nBasho {basho.id_str()}, Day {day}, {division}')
         for bout in bout_info_on_day[day]:
@@ -207,6 +222,9 @@ parser.add_argument('-d', '--division', dest='division', type=str, metavar='DIVI
                     default='Makuuchi', \
                     choices=list(map(lambda d: str(d.value), (SumoDivision))), \
                     help='Sumo division in Basho to predict.')
+parser.add_argument('--day', dest='day', type=int, metavar='DAY', \
+                    required=False, help='Only consider bouts on the given day.')
+
 parser.add_argument('--force_fetch', action='store_true', \
                     help='Force fetching of basho data from SumoAPI service')
 parser.add_argument('--db', type=str, metavar='<DATA_FILE>', \
@@ -279,6 +297,10 @@ if args.verbose > 0:
     sumodata.print_table_stats()
 
 
+on_day = -1
+if args.day:
+    on_day = args.day
+
 for basho in basho_list:
-    PredictAndPrintBasho(args, sumodata, predictor, basho, division)
+    PredictAndPrintBasho(args, sumodata, predictor, basho, division, day=on_day)
 
