@@ -52,6 +52,9 @@ class CompareBashoRecord(SumoBoutCompare):
             return 0.0
         rRecord = _rikishiRecord.get_record_on_day(day)
         oRecord = _opponentRecord.get_record_on_day(day)
+        if not rRecord or not oRecord:
+            self.debug('No records on day {day} to compare')
+            return 0.0
 
         #
         # take the difference of win percentages: this will result

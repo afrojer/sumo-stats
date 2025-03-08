@@ -100,6 +100,8 @@ class SumoMatchup():
         all_matches = list(map(lambda m: data.matches.get(m), matchlist))
 
         for m in all_matches:
+            if not m:
+                continue
             # keep track of first and last meeting dates (basho)
             if m.bashoId < self.first_meeting:
                 self.first_meeting = m.bashoId
@@ -717,6 +719,9 @@ class SumoData:
                 # we already know about all the divisions in this basho
                 if SumoData._VERBOSE > 1:
                     sys.stderr.write(f'Skipping tournament: {b.id_str()} (already in table)\n')
+                else:
+                    sys.stderr.write(f' Skip SumoTournament: {b.id_str()}\r')
+                    sys.stderr.flush()
                 return
 
             tournament.basho = b
