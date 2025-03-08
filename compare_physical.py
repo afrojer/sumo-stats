@@ -109,15 +109,18 @@ class CompareAge(SumoBoutCompare):
 
     """
     def compare(self, matchup, basho, division, day) -> float:
-        _maxAge = 52.0 * 365.25
-        _minAge = 16.0 * 365.25
-        _ageDiffRange = _maxAge - _minAge
+        # compress the age difference: most bouts will be fought by rikishi
+        # within 10-15 years of each other
+        #_maxAge = 52.0 * 365.25
+        #_minAge = 16.0 * 365.25
+        #_ageDiffRange = _maxAge - _minAge
+        _ageDiffRange = 25.0
 
-        # using rikishi as the numerator will produce positive numbers for a
-        # rikishi heavier than his opponent, and negative numbers for an
-        # opponent heavier than the rikishi
-        _diff = matchup.rikishi.age(basho.date()) - matchup.opponent.age(basho.date())
+        # Favor younger rikishi, and compress the age difference
+        _diff = matchup.opponent.age(inBasho=basho.date()) - \
+                       matchup.rikishi.age(inBasho=basho.date())
         _pct = _diff / _ageDiffRange
+        _pct = max(-0.9, min(_pct, 0.9))
 
         self.debug('AgeDiff:@agediff [@rAge, @oAge], PCT:@pct', \
                    agediff=_diff, rAge=matchup.rikishi.age(basho.date()), \
