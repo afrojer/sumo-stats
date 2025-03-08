@@ -179,7 +179,9 @@ def PredictAndPrintBasho(args, sumodata, predictor, basho, division):
     if args.verbose > 0:
         sys.stdout.write('\n\n')
 
-    pct = float(correctPredictions) / float(totalPredictions)
+    pct = 0.0
+    if totalPredictions > 0:
+        pct = float(correctPredictions) / float(totalPredictions)
     print(f'Total Predictions: {totalPredictions}')
     print(f'Correct Predictions: {correctPredictions} ({pct:.2%})')
 
@@ -245,15 +247,15 @@ predictor = SumoBoutPredictor(sumodata)
 # When constructing each, you can give a weight to that comparison.
 #
 comparisons:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 0.3), \
-    CompareHeight(sumodata, 0.2), \
-    CompareWeight(sumodata, 0.2), \
-    CompareAge(sumodata, 0.2), \
-    CompareRank(sumodata, 1.3), \
-    CompareBashoRecord(sumodata, 1.8), \
-    CompareHeadToHeadFull(sumodata, 0.8), \
-    CompareHeadToHeadCurrentDivision(sumodata, 1.7), \
-    CompareOverallRecord(sumodata, 1.2)
+    CompareBMI(sumodata, 1.05), \
+    CompareHeight(sumodata, 2.72), \
+    CompareWeight(sumodata, 1.71), \
+    CompareAge(sumodata, 2.66), \
+    CompareRank(sumodata, 8.79), \
+    CompareBashoRecord(sumodata, 51.35), \
+    CompareHeadToHeadFull(sumodata, 10.55), \
+    CompareHeadToHeadCurrentDivision(sumodata, 10.68), \
+    CompareOverallRecord(sumodata, 10.49)
 ]
 predictor.add_comparisons(comparisons)
 
