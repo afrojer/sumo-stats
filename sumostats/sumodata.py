@@ -755,33 +755,34 @@ class SumoData:
         # Updates will just replace the banzuke
         tournament.banzuke[SumoDivision(division)] = SumoBanzuke(banzuke)
 
-        max_bouts = 0
+        # request at least 1 day
+        max_days = 1
 
         # iterate over banzuke Rikishi
         if banzuke.east:
             for rikishi in banzuke.east:
                 self._add_rikishi_banzuke_record(rikishi, tournament, forceUpdate)
-                if max_bouts < len(rikishi.record):
-                    max_bouts = len(rikishi.record)
+                if max_days < len(rikishi.record):
+                    max_days = len(rikishi.record) + 1 # try to also grab the _next_ day
                 #bouts = rikishi.wins + rikishi.losses + rikishi.absences
-                #if bouts > max_bouts:
-                #    max_bouts = bouts
+                #if bouts > max_days:
+                #    max_days = bouts
         #else:
         #    sys.stderr.write(f'WARNING: No east side in banzuke:{banzuke}\n')
 
         if banzuke.west:
             for rikishi in banzuke.west:
                 self._add_rikishi_banzuke_record(rikishi, tournament, forceUpdate)
-                if max_bouts < len(rikishi.record):
-                    max_bouts = len(rikishi.record)
+                if max_days < len(rikishi.record):
+                    max_days = len(rikishi.record) + 1 # try to also grab the _next_ day
                 #bouts = rikishi.wins + rikishi.losses + rikishi.absences
-                #if bouts > max_bouts:
-                #    max_bouts = bouts
+                #if bouts > max_days:
+                #    max_days = bouts
         #else:
         #    sys.stderr.write(f'No west side in banzuke:{banzuke}\n')
 
         # For each day of the tournament, add the torikumi
-        for day in range(1, max_bouts+1):
+        for day in range(1, max_days+1):
             self._add_torikumi(tournament, division, day)
         sys.stdout.write('\n')
 
