@@ -107,8 +107,9 @@ class SumoBoutPredictor():
         else:
             weight = 0.0
             for c in self._comparison:
-                probability += c(matchup, basho, \
-                                 division, day, DEBUG) + c.shift()
+                _p = c(matchup, basho, \
+                                 division, day, DEBUG)
+                probability += _p * c.weight()
                 weight += c.weight()
             probability = probability / weight
 
@@ -153,17 +154,19 @@ class SumoBoutPredictor():
                 h['correct_predictions'] += 1.0
                 h['sum_weight_correct'] += abs(probability)
                 if h['correct_predictions'] == 1.0:
-                    h['ravg_weight_correct'] = probability
+                    h['ravg_weight_correct'] = abs(probability)
                 else:
-                    h['ravg_weight_correct'] = (h['ravg_weight_correct'] + abs(probability)) / 2.0
+                    h['ravg_weight_correct'] = (h['ravg_weight_correct'] + \
+                                                abs(probability)) / 2.0
             else:
                 # unsuccessful prediction
                 h['wrong_predictions'] += 1.0
                 h['sum_weight_wrong'] += abs(probability)
                 if h['wrong_predictions'] == 1.0:
-                    h['ravg_weight_wrong'] = probability
+                    h['ravg_weight_wrong'] = abs(probability)
                 else:
-                    h['ravg_weight_wrong'] = (h['ravg_weight_wrong'] + abs(probability)) / 2.0
+                    h['ravg_weight_wrong'] = (h['ravg_weight_wrong'] + \
+                                              abs(probability)) / 2.0
         return
 
     def get_comp_history(self):
@@ -173,13 +176,21 @@ class SumoBoutPredictor():
         for (c,h) in zip(self._comparison, self._comphistory):
             outstats = {}
             total = h['correct_predictions'] + h['wrong_predictions']
+
             correct = h['correct_predictions'] / total
-            wrong= h['wrong_predictions'] / total
             weight_correct = h['sum_weight_correct'] / h['correct_predictions']
+            ravg_weight_correct = h['ravg_weight_correct']
+
+            wrong= h['wrong_predictions'] / total
             weight_wrong = h['sum_weight_wrong'] / h['wrong_predictions']
-            outstats = {'correct':correct, 'wrong':wrong, \
-                        'weight_correct':weight_correct, \
-                        'weight_wrong':weight_wrong}
+            ravg_weight_wrong = h['ravg_weight_wrong']
+
+            outstats = {'total':total, \
+                        'correct':correct, 'wrong':wrong, \
+                        'avg_weight_correct':weight_correct, \
+                        'ravg_weight_correct':ravg_weight_correct, \
+                        'weight_wrong':weight_wrong, \
+                        'ravg_weight_wrong':ravg_weight_wrong}
             out[c.name()] = outstats
         return out
 

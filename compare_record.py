@@ -44,16 +44,26 @@ class CompareBashoRecord(SumoBoutCompare):
     Compare rikishi based on their current record in the basho.
     """
     def compare(self, matchup, basho, division, day):
-        _rikishiRecord, r_div = basho.get_rikishi_record(matchup.rikishi.id())
-        _opponentRecord, o_div = basho.get_rikishi_record(matchup.opponent.id())
+        _rikishiRecord, _ = basho.get_rikishi_record(matchup.rikishi.id())
+        _opponentRecord, _ = basho.get_rikishi_record(matchup.opponent.id())
         if not _rikishiRecord or not _opponentRecord:
             # don't compare if one or more of them doesn't have a record
             self.debug('No records to compare')
             return 0.0
+        if day <= 1:
+            # we don't have the data yet: there is no basho record!
+            self.debug('No record yet on day 1')
+            return 0.0
+
+        # get the record on the *previous* day so we have the record coming
+        # into this day, and don't accidentally use winning data to make the
+        # prediction.
+        day -= 1
+
         rRecord = _rikishiRecord.get_record_on_day(day)
         oRecord = _opponentRecord.get_record_on_day(day)
         if not rRecord or not oRecord:
-            self.debug('No records on day {day} to compare')
+            self.debug('No records on day @day to compare', day=day+1)
             return 0.0
 
         #
@@ -142,7 +152,7 @@ class CompareHeadToHeadCurrentDivision(SumoBoutCompare):
         _total = matchup.total_matches(no_fusen=True, beforeBasho=basho.date(), in_division=division)
 
         if _total == 0:
-            self.debug('No non-fusen head-to-head matches in {division} fought')
+            self.debug('No non-fusen head-to-head matches in @division fought', division=division)
             return 0.0
 
         _winPct = float(_rWins) / float(_total)

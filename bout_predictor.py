@@ -232,7 +232,7 @@ parser.add_argument('--db', type=str, metavar='<DATA_FILE>', \
                     help='All data from the SumoAPI server will be cached in this file.')
 parser.add_argument('-v', '--verbose', dest='verbose', action='count', \
                     default=0, \
-                    help='Increase verbosity of output')
+                    help='Increase verbosity of output (specify multiple times to increase verbosity)')
 
 parser.add_argument('--debug_prediction', action='store_true', \
                     help='Turn on prediction debuging')

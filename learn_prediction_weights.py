@@ -221,15 +221,15 @@ predictor = SumoBoutPredictor(sumodata)
 #    CompareOverallRecord(sumodata, 0.9) \
 #]
 comparisons:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 1.05), \
-    CompareHeight(sumodata, 2.72), \
-    CompareWeight(sumodata, 1.71), \
-    CompareAge(sumodata, 2.66), \
-    CompareRank(sumodata, 8.79), \
-    CompareBashoRecord(sumodata, 51.35), \
-    CompareHeadToHeadFull(sumodata, 10.55), \
-    CompareHeadToHeadCurrentDivision(sumodata, 10.68), \
-    CompareOverallRecord(sumodata, 10.49) \
+    CompareBMI(sumodata, 0.35), \
+    CompareHeight(sumodata, 2.75), \
+    CompareWeight(sumodata, 1.28), \
+    CompareAge(sumodata, 4.06), \
+    CompareRank(sumodata, 6.87), \
+    CompareBashoRecord(sumodata, 7.18), \
+    CompareHeadToHeadFull(sumodata, 9.88), \
+    CompareHeadToHeadCurrentDivision(sumodata, 10.65), \
+    CompareOverallRecord(sumodata, 1.21) \
 ]
 predictor.add_comparisons(comparisons)
 
@@ -263,7 +263,10 @@ ch = predictor.get_comp_history()
 if ch:
     total = 0.0
     for k,v in ch.items():
-        sys.stdout.write(f'{k} = {v}\n')
+        sys.stdout.write(f'{k} =' + " { ")
+        for _k,_v in v.items():
+            sys.stdout.write(f'{_k}:{_v:.2f} ')
+        sys.stdout.write("}\n")
         dist = v['correct'] - 0.50
         v['dist'] = dist
         total += dist
@@ -271,6 +274,10 @@ if ch:
         pct = v['dist'] / total
         sys.stdout.write(f'{k}:{pct:.2%}\n')
 
-print(prediction_stats)
+sys.stdout.write("Stats: { ")
+for k,v in prediction_stats.items():
+    sys.stdout.write(f'{k}:{v:.2f} ')
+sys.stdout.write("}\n")
+
 win_pct = prediction_stats['win_num'] / (prediction_stats['win_num'] + prediction_stats['lose_num'])
-sys.stdout.write(f'Win Pct: {win_pct}\n')
+sys.stdout.write(f'Win Pct: {win_pct:.2%}\n')
