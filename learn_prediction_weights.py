@@ -221,15 +221,15 @@ predictor = SumoBoutPredictor(sumodata)
 #    CompareOverallRecord(sumodata, 0.9) \
 #]
 comparisons:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 0.35), \
-    CompareHeight(sumodata, 2.75), \
-    CompareWeight(sumodata, 1.28), \
-    CompareAge(sumodata, 4.06), \
-    CompareRank(sumodata, 6.87), \
-    CompareBashoRecord(sumodata, 7.18), \
-    CompareHeadToHeadFull(sumodata, 9.88), \
-    CompareHeadToHeadCurrentDivision(sumodata, 10.65), \
-    CompareOverallRecord(sumodata, 1.21) \
+    CompareBMI(sumodata, 1.78), \
+    CompareHeight(sumodata, 4.64), \
+    CompareWeight(sumodata, 2.91), \
+    CompareAge(sumodata, 4.53), \
+    CompareRank(sumodata, 14.97), \
+    CompareBashoRecord(sumodata, 17.16), \
+    CompareHeadToHeadFull(sumodata, 17.96), \
+    CompareHeadToHeadCurrentDivision(sumodata, 18.18), \
+    CompareOverallRecord(sumodata, 17.86) \
 ]
 predictor.add_comparisons(comparisons)
 

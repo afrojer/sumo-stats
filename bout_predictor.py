@@ -267,16 +267,27 @@ predictor = SumoBoutPredictor(sumodata)
 # Create a list of comparison objects.
 # When constructing each, you can give a weight to that comparison.
 #
+#comparisons:list[SumoBoutCompare] = [ \
+#    CompareBMI(sumodata, 1.05), \
+#    CompareHeight(sumodata, 2.72), \
+#    CompareWeight(sumodata, 1.71), \
+#    CompareAge(sumodata, 2.66), \
+#    CompareRank(sumodata, 8.79), \
+#    CompareBashoRecord(sumodata, 51.35), \
+#    CompareHeadToHeadFull(sumodata, 10.55), \
+#    CompareHeadToHeadCurrentDivision(sumodata, 10.68), \
+#    CompareOverallRecord(sumodata, 10.49)
+#]
 comparisons:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 1.05), \
-    CompareHeight(sumodata, 2.72), \
-    CompareWeight(sumodata, 1.71), \
-    CompareAge(sumodata, 2.66), \
-    CompareRank(sumodata, 8.79), \
-    CompareBashoRecord(sumodata, 51.35), \
-    CompareHeadToHeadFull(sumodata, 10.55), \
-    CompareHeadToHeadCurrentDivision(sumodata, 10.68), \
-    CompareOverallRecord(sumodata, 10.49)
+    CompareBMI(sumodata, 1.78), \
+    CompareHeight(sumodata, 4.64), \
+    CompareWeight(sumodata, 2.91), \
+    CompareAge(sumodata, 4.53), \
+    CompareRank(sumodata, 14.97), \
+    CompareBashoRecord(sumodata, 17.16), \
+    CompareHeadToHeadFull(sumodata, 17.96), \
+    CompareHeadToHeadCurrentDivision(sumodata, 18.18), \
+    CompareOverallRecord(sumodata, 17.86) \
 ]
 predictor.add_comparisons(comparisons)
 
