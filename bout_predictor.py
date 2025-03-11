@@ -169,10 +169,13 @@ def PredictAndPrintBasho(args, sumodata, predictor, basho, division, day = -1):
         if args.verbose > 0:
             print(f'\n{"*"*79}\nBasho {basho.id_str()}, Day {day}, {division}')
         for bout in bout_info_on_day[day]:
+            _rday = day - 1
+            if day <= 1:
+                _rday = 0
             east = sumodata.get_rikishi(bout.match.eastId)
-            eastRecord = banzuke.get_record_on_day(east.id(), day)
+            eastRecord = banzuke.get_record_on_day(east.id(), _rday)
             west = sumodata.get_rikishi(bout.match.westId)
-            westRecord = banzuke.get_record_on_day(west.id(), day)
+            westRecord = banzuke.get_record_on_day(west.id(), _rday)
 
             if args.verbose > 0:
                 if args.verbose > 1:
