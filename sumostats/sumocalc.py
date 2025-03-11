@@ -109,7 +109,9 @@ class SumoBoutPredictor():
             for c in self._comparison:
                 _p = c(matchup, basho, \
                                  division, day, DEBUG)
-                probability += _p * c.weight()
+                if DEBUG:
+                    sys.stderr.write(f'  {c.name()}: _p={_p} w={c.weight()}\n')
+                probability += _p
                 weight += c.weight()
             probability = probability / weight
 
@@ -142,7 +144,7 @@ class SumoBoutPredictor():
         #
         for (c,h) in zip(self._comparison, self._comphistory):
             probability = c(matchup, basho, \
-                                 division, day, DEBUG)
+                                 division, day, DEBUG) / c.weight()
 
             # TODO: full stats on predictions
             if probability == 0.0:
