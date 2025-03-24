@@ -116,6 +116,74 @@ class CompareBashoRecord(SumoBoutCompare):
                    pct=_pct)
         return _pct
 
+class CompareWinStreak(SumoBoutCompare):
+    """
+    Compare rikishi based on their current win streak
+    """
+    def compare(self, matchup, basho, division, day):
+
+        _rikishiRecord, _ = basho.get_rikishi_record(matchup.rikishi.id())
+        _opponentRecord, _ = basho.get_rikishi_record(matchup.opponent.id())
+        if not _rikishiRecord or not _opponentRecord:
+            # don't compare if one or more of them doesn't have a record
+            self.debug('No records to compare')
+            return 0.0
+        if day <= 1:
+            # we don't have the data yet: there is no basho record!
+            self.debug('No record yet on day 1')
+            return 0.0
+
+        # get the record on the *previous* day so we have the record coming
+        # into this day, and don't accidentally use winning data to make the
+        # prediction.
+        day -= 1
+
+        _r_win_streak = 0
+        _r_lose_streak = 0
+        for _, br in _rikishiRecord.each_match(until=day):
+            if br.result == SumoResult.WIN:
+                _r_win_streak += 1
+                _r_lose_streak = 0
+            else:
+                _r_win_streak = 0
+                _r_lose_streak += 1
+
+        # Look at the opponent to see if he's on a win-streak
+        _o_win_streak = 0
+        _o_lose_streak = 0
+        for _, br in _opponentRecord.each_match(until=day):
+            if br.result == SumoResult.WIN:
+                _o_win_streak += 1
+                _o_lose_streak = 0
+            else:
+                _o_win_streak = 0
+                _o_lose_streak += 1
+
+        #
+        # If "higher" rank, win streak == more likely to win?
+        # If "lower" rank, win streak == more likely to lose?
+        #
+        _pct = 0.0
+        if _r_win_streak > 0 and _o_lose_streak > 0:
+            _pct = (float(_r_win_streak) + float(_o_lose_streak)) / (2 * float(day))
+        elif _o_win_streak > 0 and _r_lose_streak > 0:
+            _pct = -(float(_o_win_streak) + float(_r_lose_streak)) / (2 * float(day))
+        elif _r_win_streak > 0 and _o_win_streak > 0:
+            _pct = float(_r_win_streak - _o_win_streak) / float(max(_r_win_streak, _o_win_streak))
+        elif _r_win_streak > 0:
+            # rikishi is on a streak, but opponent is not
+            _pct = 0.5 * (float(_r_win_streak) / float(day))
+        elif _o_win_streak > 0:
+            # opponent is on a win streak, but rikishi is not
+            _pct = -0.5 * (float(_o_win_streak) / float(day))
+
+        self.debug('rWinStreak:@rwinstreak, rLoseStreak:@rlosestreak, oWinStreak:@owinstreak, oLoseStreak:@olosestreak, PCT:@pct', \
+                   rwinstreak=_r_win_streak, rlosestreak=_r_lose_streak, \
+                   owinstreak=_o_win_streak, olosestreak=_o_lose_streak, \
+                   pct=_pct)
+        return _pct
+
+
 class CompareHeadToHeadFull(SumoBoutCompare):
     """
     Compare rikishi based on their entire head-to-head record
