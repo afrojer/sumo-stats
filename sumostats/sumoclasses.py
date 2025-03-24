@@ -10,12 +10,12 @@ from .sumoclassdata import _RikishiRankValue
 
 __EMPTY_BASHO_DATE__: date = date(1,1,1)
 
-def _decode_datetime(datestr):
+def _decode_datetime(datestr:str) -> datetime:
     """ custom decoder for older python versions that don't like the 'Z' in for iso date format """
     #print(f'INPUT:{datestr}')
     return datetime.fromisoformat(datestr.replace('Z', '+00:00'))
 
-def _decode_date(datestr):
+def _decode_date(datestr:str) -> date:
     """ custom decoder for older python versions that only like YYYY-MM-DD """
     #print(f'INPUT:{datestr}')
     while len(datestr) < 8:
@@ -25,10 +25,10 @@ def _decode_date(datestr):
         return __EMPTY_BASHO_DATE__
     return date.fromisoformat(f'{m.group(1)}-{m.group(2)}-{m.group(3)}')
 
-def BashoIdStr(bashoId: date):
+def BashoIdStr(bashoId: date) -> str:
     return f'{bashoId.year:04}{bashoId.month:02}'
 
-def BashoDate(bashoStr: str):
+def BashoDate(bashoStr: str) -> date:
     while len(bashoStr) < 8:
         bashoStr += '01'
     m = re.match(r'(\d{4})(\d{2})(\d{2})', bashoStr)

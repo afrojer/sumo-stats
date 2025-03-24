@@ -7,6 +7,9 @@ from datetime import date
 from dateutil.relativedelta import *
 import sys
 
+##
+## SumoBoutCompare
+##
 class SumoBoutCompare():
     """
     SumoBoutCompare
@@ -54,12 +57,22 @@ class SumoBoutCompare():
         sys.stdout.write(f'  {self.name()}: {fmtStr}\n')
 
     def __call__(self, matchup:SumoMatchup, basho:SumoTournament, division:SumoDivision, day:int, DEBUG=False) -> float:
+        # Call the comparison function
         self._DEBUG = DEBUG
-        result = self.compare(matchup, basho, division, day) * self._weight
+        _pct = self.compare(matchup, basho, division, day)
+
+        result = _pct
+        _w = self._weight
+
+        result = result * _w
+
         self._DEBUG = False
-        return result
+        return result, _w
 
 
+##
+## SumoBoutPredictor
+##
 class SumoBoutPredictor():
     """
     BoutPredictor
@@ -74,6 +87,9 @@ class SumoBoutPredictor():
         self._comparison: list[SumoBoutCompare] = comparison
         self._comphistory: list[dict[str, float]] = []
 
+    ##
+    ## add_comparison
+    ##
     def add_comparison(self, compare:SumoBoutCompare):
         """
         Add a single bout comparison object to the predictor
@@ -81,6 +97,9 @@ class SumoBoutPredictor():
         self._comparison.append(compare)
         return
 
+    ##
+    ## add_comparisons
+    ##
     def add_comparisons(self, compare:list[SumoBoutCompare]):
         """
         Add a list of bout comparison objects to the predictor
@@ -88,6 +107,9 @@ class SumoBoutPredictor():
         self._comparison.extend(compare)
         return
 
+    ##
+    ## predict
+    ##
     def predict(self, matchup:SumoMatchup, basho:SumoTournament, \
                 division:SumoDivision, day:int, DEBUG=False) -> {SumoWrestler, float}:
         """
@@ -107,13 +129,13 @@ class SumoBoutPredictor():
         else:
             weight = 0.0
             for c in self._comparison:
-                _p = c(matchup, basho, \
-                                 division, day, DEBUG)
+                _p, _w = c(matchup, basho, division, day, DEBUG)
                 if DEBUG:
-                    sys.stderr.write(f'  {c.name()}: _p={_p} w={c.weight()}\n')
+                    sys.stderr.write(f'  {c.name()}: _p={_p} w={_w}\n')
                 probability += _p
-                weight += c.weight()
-            probability = probability / weight
+                weight += _w
+            if weight > 0.0:
+                probability = probability / weight
 
         if probability >= 0.0:
             # favor the Rikishi in an even match (exactly 0.0)
@@ -121,6 +143,9 @@ class SumoBoutPredictor():
         else:
             return matchup.opponent, probability
 
+    ##
+    ## learn_result
+    ##
     def learn_result(self, winnerId:int, matchup:SumoMatchup, \
                      basho:SumoTournament, division:SumoDivision, \
                      day:int, DEBUG=False):
@@ -143,12 +168,20 @@ class SumoBoutPredictor():
         # against the actual winner and gather some stats.
         #
         for (c,h) in zip(self._comparison, self._comphistory):
-            probability = c(matchup, basho, \
-                                 division, day, DEBUG) / c.weight()
+            # divide by weight because calling the predictor automatically
+            # multiplies by the arbitrary weight. That weight is exactly
+            # what we are trying to influence / determine, so we need
+            # to factor it out to investigate the efficacy of the comparison
+            # itself.
+            probability, _w = c(matchup, basho, division, day, DEBUG)
+            if _w == 0.0:
+                probability = 0.0
+            else:
+                probability = probability / _w
 
             # TODO: full stats on predictions
             if probability == 0.0:
-                # predictory has no opinion here - skip to next one
+                # predictor has no opinion here - skip to next one
                 continue
             elif (probability > 0.0 and (matchup.rikishi.id() == winnerId)) or \
                  (probability < 0.0 and (matchup.opponent.id() == winnerId)):
