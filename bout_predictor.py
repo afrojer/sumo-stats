@@ -21,6 +21,7 @@ from sumostats.sumocalc import *
 # local sumo comparison functions!
 from compare_physical import *
 from compare_record import *
+from predictor_loader import *
 
 
 @dataclass()
@@ -228,6 +229,9 @@ parser.add_argument('-d', '--division', dest='division', type=str, metavar='DIVI
 parser.add_argument('--day', dest='day', type=int, metavar='DAY', \
                     required=False, help='Only consider bouts on the given day.')
 
+parser.add_argument('--load-config', dest='load_config', type=str, metavar='<FILE>', \
+                    help='Specify the config file used to construct a sumo bout predictor object')
+
 parser.add_argument('--force_fetch', action='store_true', \
                     help='Force fetching of basho data from SumoAPI service')
 parser.add_argument('--db', type=str, metavar='<DATA_FILE>', \
@@ -259,37 +263,33 @@ try:
 except:
     sumodata = SumoData()
 
-# Create an empty prediction instance 
 #
-predictor = SumoBoutPredictor(sumodata)
-
+# Create a predictor instance based on a config file, or default to a fixed set of comarators and weights
 #
-# Create a list of comparison objects.
-# When constructing each, you can give a weight to that comparison.
-#
-#comparisons:list[SumoBoutCompare] = [ \
-#    CompareBMI(sumodata, 1.05), \
-#    CompareHeight(sumodata, 2.72), \
-#    CompareWeight(sumodata, 1.71), \
-#    CompareAge(sumodata, 2.66), \
-#    CompareRank(sumodata, 8.79), \
-#    CompareBashoRecord(sumodata, 51.35), \
-#    CompareHeadToHeadFull(sumodata, 10.55), \
-#    CompareHeadToHeadCurrentDivision(sumodata, 10.68), \
-#    CompareOverallRecord(sumodata, 10.49)
-#]
-comparisons:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 1.78), \
-    CompareHeight(sumodata, 4.64), \
-    CompareWeight(sumodata, 2.91), \
-    CompareAge(sumodata, 4.53), \
-    CompareRank(sumodata, 14.97), \
-    CompareBashoRecord(sumodata, 17.16), \
-    CompareHeadToHeadFull(sumodata, 17.96), \
-    CompareHeadToHeadCurrentDivision(sumodata, 18.18), \
-    CompareOverallRecord(sumodata, 17.86) \
-]
-predictor.add_comparisons(comparisons)
+predictor = None
+if args.load_config:
+    predictor = SumoBoutPredictorLoader.from_json(args.load_config, sumodata)
+    if not predictor:
+        sys.stderr.write(f'Could not create predictor from config file "{args.load_config}"\n')
+        sys.exit(-1)
+else:
+    predictor = SumoBoutPredictor(sumodata)
+    #
+    # Create a list of comparison objects.
+    # When constructing each, you can give a weight to that comparison.
+    #
+    comparisons:list[SumoBoutCompare] = [ \
+        CompareBMI(sumodata, 1.78), \
+        CompareHeight(sumodata, 4.64), \
+        CompareWeight(sumodata, 2.91), \
+        CompareAge(sumodata, 4.53), \
+        CompareRank(sumodata, 14.97), \
+        CompareBashoRecord(sumodata, 17.16), \
+        CompareHeadToHeadFull(sumodata, 17.96), \
+        CompareHeadToHeadCurrentDivision(sumodata, 18.18), \
+        CompareOverallRecord(sumodata, 17.86) \
+    ]
+    predictor.add_comparisons(comparisons)
 
 # set the division to focus on from the input arguments
 division = SumoDivision(args.division)
