@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 #
-# bout_predictor.py
+# learn_prediction_weights.py
 #
-# An example script which attempts to find a set of matchups, and
-# then use a fixed list of comparators to predict the outcome.
+# 
 #
 
 import os
@@ -21,6 +20,7 @@ from sumostats.sumocalc import *
 # local sumo comparison functions!
 from compare_physical import *
 from compare_record import *
+from predictor_loader import *
 
 
 #@dataclass()
@@ -72,83 +72,6 @@ def LearnAboutBasho(args, sumodata, predictor, basho, division, prediction_stats
     sys.stdout.write('\n')
 
 
-## def PrintBoutInfo(sumodata, basho_match, eastId, eastRecord, westId, westRecord):
-##     bashoId = basho_match.bashoId
-## 
-##     #
-##     # print header
-##     #
-##     sys.stdout.write(f'\n{"-"*79}\nMatch {basho_match.matchNo}\n')
-## 
-##     east = sumodata.get_rikishi(eastId)
-##     west = sumodata.get_rikishi(westId)
-## 
-##     #
-##     # Generate the matchup record for these two, use the "east" side as the
-##     # Rikishi in the matchup object. So it's "east" vs. "west" (opponent)
-##     #
-##     eastMatchup = sumodata.get_matchup(east.id(), west.id())
-## 
-##     #
-##     # Print Stats
-##     #
-##     eastDescription = f'{east.shikonaEn()} ({east.rikishi.currentRank})'
-##     westDescription = f'{west.shikonaEn()} ({west.rikishi.currentRank})'
-##     sys.stdout.write(f'{eastDescription:>35}  -vs-  {westDescription:<35}\n')
-## 
-##     # record in the bazuke/basho
-##     if eastRecord:
-##         desc = f'{eastRecord.wins}-{eastRecord.losses}'
-##         if eastRecord.absences > 0:
-##             desc += f'-{eastRecord.absences}'
-##         sys.stdout.write(desc.center(35))
-##     else:
-##         sys.stdout.write(f'{" "*35}')
-##     sys.stdout.write(f'{" "*8}')
-##     if westRecord:
-##         desc = f'{westRecord.wins}-{westRecord.losses}'
-##         if westRecord.absences > 0:
-##             desc += f'-{westRecord.absences}'
-##         sys.stdout.write(desc.center(35))
-##     else:
-##         sys.stdout.write(f'{" "*35}')
-## 
-##     # Matchup History
-##     if not eastMatchup or eastMatchup.total_matches(beforeBasho=bashoId) == 0:
-##         sys.stdout.write(f'\n    First meeting')
-##     else:
-##         # last 6 basho (not including this one)
-##         nbasho = 6
-##         for match in eastMatchup.each_match(beforeBasho=bashoId):
-##             win_kimarite = ''
-##             lose_kimarite = ''
-##             if match.winnerId== east.id():
-##                 win_kimarite = match.kimarite
-##             else:
-##                 lose_kimarite = match.kimarite
-##             sys.stdout.write(f'\n    {win_kimarite:>31} {BashoIdStr(match.bashoId)} {lose_kimarite:<35}')
-##             nbasho -= 1
-##             if nbasho == 0:
-##                 break
-## 
-##         # win[-fusensho] - loss[+fusenpai]
-##         sys.stdout.write(f'\n    Head-to-Head Record\n    -------------------')
-##         sys.stdout.write(f'\n    Overall: {eastMatchup.wins(True)}')
-##         fusen=eastMatchup.fusensho(beforeBasho=bashoId)
-##         if fusen > 0:
-##             sys.stdout.write(f'[-{fusen}]')
-##         sys.stdout.write(f' - {eastMatchup.losses(no_fusenpai=True, beforeBasho=bashoId)}')
-##         fusen=eastMatchup.fusenpai(beforeBasho=bashoId)
-##         if fusen > 0:
-##             sys.stdout.write(f'[+{fusen}]')
-## 
-##         # win-loss in each division
-##         for div, matchup in eastMatchup.each_division():
-##             sys.stdout.write(f'\n    {div:10}: {matchup.rikishiWins}-{matchup.opponentWins}')
-## 
-##     sys.stdout.write('\n\n')
-
-
 ########################################################################
 #
 # Main
@@ -172,6 +95,10 @@ parser.add_argument('-d', '--division', dest='division', type=str, metavar='DIVI
                     help='Sumo division in Basho to predict.')
 parser.add_argument('--force_fetch', action='store_true', \
                     help='Force fetching of basho data from SumoAPI service')
+parser.add_argument('--load-config', dest='load_config', type=str, metavar='<FILE>', \
+                    help='Specify the config file used to construct a sumo bout predictor object')
+parser.add_argument('--save-config', dest='save_config', type=str, metavar='<FILE>', \
+                    help='Save suggested configuration to <FILE>')
 parser.add_argument('--db', type=str, metavar='<DATA_FILE>', \
                     default='sumo_data.pickle', \
                     help='All data from the SumoAPI server will be cached in this file.')
@@ -201,37 +128,34 @@ try:
 except:
     sumodata = SumoData()
 
-# Create an empty prediction instance 
 #
-predictor = SumoBoutPredictor(sumodata)
-
+# Create a predictor instance based on a config file, or default to a fixed set of comarators and weights
 #
-# Create a list of comparison objects.
-# When constructing each, you can give a weight to that comparison.
-#
-#comparisons:list[SumoBoutCompare] = [ \
-#    CompareBMI(sumodata, 0.1), \
-#    CompareHeight(sumodata, 0.3), \
-#    CompareWeight(sumodata, 0.2), \
-#    CompareAge(sumodata, 0.3), \
-#    CompareRank(sumodata, 0.8), \
-#    CompareBashoRecord(sumodata, 1.7), \
-#    CompareHeadToHeadFull(sumodata, 0.9), \
-#    CompareHeadToHeadCurrentDivision(sumodata, 0.9), \
-#    CompareOverallRecord(sumodata, 0.9) \
-#]
-comparisons:list[SumoBoutCompare] = [ \
-    CompareBMI(sumodata, 1.78), \
-    CompareHeight(sumodata, 4.64), \
-    CompareWeight(sumodata, 2.91), \
-    CompareAge(sumodata, 4.53), \
-    CompareRank(sumodata, 14.97), \
-    CompareBashoRecord(sumodata, 17.16), \
-    CompareHeadToHeadFull(sumodata, 17.96), \
-    CompareHeadToHeadCurrentDivision(sumodata, 18.18), \
-    CompareOverallRecord(sumodata, 17.86) \
-]
-predictor.add_comparisons(comparisons)
+predictor = None
+if args.load_config:
+    predictor = SumoBoutPredictorLoader.from_json(args.load_config, sumodata)
+    if not predictor:
+        sys.stderr.write(f'Could not create predictor from config file "{args.load_config}"\n')
+        sys.exit(-1)
+else:
+    predictor = SumoBoutPredictor(sumodata)
+    #
+    # Create a list of comparison objects.
+    # When constructing each, you can give a weight to that comparison.
+    #
+    comparisons:list[SumoBoutCompare] = [ \
+        CompareBMI(sumodata, 1.46), \
+        CompareHeight(sumodata, 3.28), \
+        CompareWeight(sumodata, 2.24), \
+        CompareAge(sumodata, 5.24), \
+        CompareRank(sumodata, 15.08), \
+        CompareBashoRecord(sumodata, 15.50), \
+        CompareHeadToHeadFull(sumodata, 15.13), \
+        CompareHeadToHeadCurrentDivision(sumodata, 15.18), \
+        CompareOverallRecord(sumodata, 15.16), \
+        CompareWinStreak(sumodata, 11.74) \
+    ]
+    predictor.add_comparisons(comparisons)
 
 # set the division to focus on from the input arguments
 division = SumoDivision(args.division)
@@ -258,21 +182,25 @@ else:
             LearnAboutBasho(args, sumodata, predictor, _basho, division, prediction_stats)
 
 
-#predictor.print_learned_results()
-ch = predictor.get_comp_history()
-if ch:
-    total = 0.0
-    for k,v in ch.items():
-        sys.stdout.write(f'{k} =' + " { ")
-        for _k,_v in v.items():
-            sys.stdout.write(f'{_k}:{_v:.2f} ')
-        sys.stdout.write("}\n")
-        dist = v['correct'] - 0.50
-        v['dist'] = dist
-        total += dist
-    for k,v in ch.items():
-        pct = v['dist'] / total
-        sys.stdout.write(f'{k}:{pct:.2%}\n')
+if args.verbose > 0:
+    ch = predictor.get_comp_history()
+    if ch:
+        total = 0.0
+        for k,v in ch.items():
+            sys.stdout.write(f'{k} = {str(v)}\n')
+            dist = v.pct_correct() - 0.50
+            total += v.distance_from_p50()
+        for k,v in ch.items():
+            pct = v.distance_from_p50() / total
+            sys.stdout.write(f'{k}:{pct:.2%}\n')
+
+jstr = SumoBoutPredictorLoader.to_json(predictor)
+if args.verbose > 0:
+    sys.stdout.write(jstr)
+    sys.stdout.write('\n\n')
+
+if args.save_config:
+    SumoBoutPredictorLoader.save_json(predictor, args.save_config)
 
 sys.stdout.write("Stats: { ")
 for k,v in prediction_stats.items():
